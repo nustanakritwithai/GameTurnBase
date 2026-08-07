@@ -91,12 +91,21 @@ Do **not** plan or implement these until HetCreep reopens them:
 
 # §3 — Combat model
 
-## 3.1 Movement (LOCKED)
+## 3.1 Movement & coordinates (LOCKED)
 
 - Field: **2.5D plane**
 - Move: **left, right, up, down, diagonal** (joystick vector OK)
 - **Up/down = depth** positioning to align with enemies
 - Movement and attack direction are **separate systems**
+
+**Canonical battle coordinates (LOCKED — backfill P1 contract, matches shipped `src/game/realtimeBattle/battleCoordinates.ts`):**
+
+| Axis                           | Runtime meaning                                | Notes                                                                        |
+| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| **battle X**                   | Horizontal left / right                        | Combat logic, collision, AI, hitboxes                                        |
+| **battle depth** (`runtime.y`) | Screen-plane up / down (front ↔ back on arena) | Lower = farther from camera / back lane; higher = nearer camera / front lane |
+
+**Rendering contract:** presentation layer maps battle coordinates → Three.js world axes (`runtime.x` → `worldX`, `runtime.y` → `worldZ`; `worldY` = height only). **Combat logic must not use raw render Z/Y as depth** — always use canonical battle X + battle depth.
 
 ## 3.2 Attack axis (LOCKED)
 
@@ -114,7 +123,25 @@ Do **not** plan or implement these until HetCreep reopens them:
 |                  | **Skill 3**      |
 |                  | **Ultimate**     |
 
+**Layout (LOCKED 2026-08-07):** joystick **bottom-left**; **S1 · S2 · S3 · Ultimate** in a row **above** the attack button; **Basic Attack** = **largest button, bottom-right**. Walk and press Attack/Skill simultaneously (separate pointer ids).
+
+**Button presentation (LOCKED 2026-08-07):**
+
+- **Basic Attack:** **icon only** (no text label on button)
+- **Skills S1–S3 / Ultimate:** numeric/icon slots — **art icons TBD** (placeholder until assets land)
+- **Ultimate when gauge empty:** button **pressable but no effect** (no disabled state required)
+
+**PC keybinds (LOCKED):**
+
+| Action                      | Keys                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Movement**                | `W` `A` `S` `D` **and** Arrow Keys — **equivalent to virtual joystick**; diagonal from simultaneous keys |
+| **Attack**                  | `J` / `Space`                                                                                            |
+| **S1 / S2 / S3 / Ultimate** | `1`/`E` · `2`/`R` · `3`/`F` · `4`/`Q`                                                                    |
+
 **No separate Dash button.**
+
+**No soft-target, no auto-snap, no hard lock-on UI.** See §3.6.
 
 PC: keyboard/mouse/controller-ready; same action layer.
 
@@ -129,6 +156,234 @@ PC: keyboard/mouse/controller-ready; same action layer.
 - Combat facing: **LEFT / RIGHT**
 - **RIGHT master sprite** → horizontal flip for LEFT when symmetric
 - Movement sprites: L/R/U/D; diagonal optional
+
+## 3.6 Combat Foundation Design Lock (LOCKED — HetCreep Ring 0, 2026-08-07)
+
+> **Status:** Design contract for P4 (Enemy AI) and P6 (Boss).  
+> **Closes gap:** fork issue [#33](https://github.com/nustanakritwithai/GameTurnBase/issues/33) (boss telegraph/state-machine + soft-target).  
+> **Implementation:** separate PRs only — this section is documentation, not gameplay code.
+
+### 3.6.1 Controls & targeting
+
+| Rule                                         | Decision                                                                                     |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Mobile layout                                | Joystick left + S1/S2/S3/U + large Attack bottom-right (§3.3)                                |
+| Dash button                                  | **CUT** — not in UI                                                                          |
+| Soft-target / auto-snap / hard lock (global) | **CUT** for basic movement, facing, and basic attack — player positions depth + L/R manually |
+| Skill-specific target lock                   | **Allowed per skill definition only** (e.g. Ultimate — see §3.7); not a global assist        |
+| `combatFacing` source                        | Movement / joystick vector                                                                   |
+| Vertical-only movement                       | **Keep previous facing** (no auto flip)                                                      |
+| Walk + Attack/Skill                          | **Allowed** simultaneously                                                                   |
+
+### 3.6.2 Basic attack
+
+- **Multi-target:** every enemy inside the active hitbox takes damage — **not** single-target selection.
+- **No target magnet:** attacks do not pull the player toward enemies.
+- **Attack lunge:** on press, character moves **slightly forward** along `combatFacing`. This is **lunge**, not magnet.
+- **Flow:** `Movement → Attack Wind-up/Lunge → AttackActive → Recovery`
+
+### 3.6.3 Movement during combat
+
+- Player may **press Attack while walking**.
+- During **AttackActive**, **no 100% free movement** — attack animation/lunge drives position to prevent unnatural hitbox dragging through enemies.
+
+### 3.6.4 Skill casting
+
+- Skills support **cast delay / wind-up** before AttackActive.
+- **Flow:** `Input → Cast/Wind-up → AttackActive → Recovery`
+- During cast/wind-up: if hit by an **interruptible** attack → **cancel cast** → `Casting → Interrupted → Hit Reaction`
+- **Do not** hard-code “every skill interrupts the same.” Per-move properties govern behavior.
+
+### 3.6.5 Normal hit reaction
+
+When hit by a **normal/basic** attack:
+
+`Hit → Small Knockback → Short Hitstun → Resume`
+
+- Small backward push + brief stun.
+- **Knockdown is NOT** the default for every normal hit.
+
+**Knockdown reserved for:** heavy attacks, specific skills, combo finishers, elite/boss rules.
+
+### 3.6.6 Interrupt rules
+
+Interrupt capability is a **per-attack property**, not a global rule.
+
+**Forbidden:** “getting hit always cancels everything.”
+
+Future **hyper armor / uninterruptible** windows are allowed per move design.
+
+### 3.6.7 Per-move property contract (LOCKED schema)
+
+Every attack/skill definition should carry its own data (extend `AttackDefinition` / skill defs in implementation PRs):
+
+| Property                                | Purpose                                                                                                                                                    |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startupMs` / `activeMs` / `recoveryMs` | Phase timing (existing)                                                                                                                                    |
+| `castDelayMs`                           | Wind-up before active (skills; basic may be 0 or folded into startup)                                                                                      |
+| `interruptible`                         | **Default** — can this move be cancelled by incoming hit? (usually one bool per move)                                                                      |
+| `phaseOverrides`                        | **Optional** — per-phase overrides when phases differ: `cast` / `startup` / `active` / `recovery` each may set `interruptible`, `movementDuringCast`, etc. |
+| `movementDuringCast`                    | Allowed movement while casting (usually none or reduced)                                                                                                   |
+| `lungeDistance`                         | Forward displacement on attack (basic attack lunge)                                                                                                        |
+| `hitstunMs`                             | Stun applied to target on hit                                                                                                                              |
+| `knockback`                             | Push distance (existing)                                                                                                                                   |
+| `knockdown`                             | Whether this move can knock down                                                                                                                           |
+| `multiTarget`                           | Hit all in box vs single target (basic = true)                                                                                                             |
+| `hitShape` / `range` / `depthTolerance` | Hit geometry (existing P2 model)                                                                                                                           |
+| `effects`                               | **Optional** — non-damage or supplemental move outcomes (see below)                                                                                        |
+
+**Schema rule (LOCKED):** use `interruptible` as the **move-level default**. Add `phaseOverrides` **only** when a specific phase must differ (e.g. uninterruptible clone/setup, then interruptible strike phases). **Do not** require phase-interruptible data on every move — keeps per-move data-driven and scales to boss kits.
+
+**Non-damage / multi-outcome moves (LOCKED architecture — CONFIRMED Ring 0, #47):**
+
+Damage-only moves keep existing hitbox fields — **no `effects[]` required**. When a move heals, buffs, CCs, or summons, add optional `effects[]` (same per-move data-driven pattern as `phaseOverrides`):
+
+```ts
+type MoveEffectKind = 'damage' | 'heal' | 'buff' | 'debuff' | 'cc' | 'summon'
+
+interface MoveEffect {
+  kind: MoveEffectKind
+  target:
+    'self' | 'singleEnemy' | 'nearestEnemy' | 'allEnemies' | 'singleAlly' | 'allAllies' | 'aoe'
+  amount?: number
+  buffId?: string
+  durationMs?: number
+  ccType?: 'stun' | 'slow' | 'root' | 'silence'
+  summonEntityId?: string
+  summonMaxActive?: number
+  summonDurationMs?: number
+}
+```
+
+| Archetype (§4.1)                    | Typical `effects` usage       | Combat engine                                            |
+| ----------------------------------- | ----------------------------- | -------------------------------------------------------- |
+| Fighter / Ranged / Assassin / Heavy | damage via hitbox (existing)  | unchanged                                                |
+| Control                             | `cc` / `debuff` on hit or AoE | reuse hit reaction + existing state machine              |
+| Support                             | `heal` / `buff` on allies     | same targeting/range rules as attacks (§3.1 coords)      |
+| Summoner                            | `summon` spawns entity        | reuse spawn/entity pool — **no summon-specific AI core** |
+
+Hero kit files add `archetype` metadata; **move schema stays shared** across all archetypes.
+
+**P4 enemy moves use the same schema** as player attacks/skills.
+
+Boss/enemy attacks additionally define: `telegraphMs`, `attackShape`, phase eligibility.
+
+### 3.6.8 Enemy tiers & state machine (LOCKED)
+
+#### Enemy tiers
+
+| Tier           | Definition                                        | AI core                       | Knockdown                                                                         | Notes                                                                         |
+| -------------- | ------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Normal mob** | Default P4 enemy                                  | Shared Enemy AI core          | **No** (P4 baseline — hitstun only)                                               | Ground telegraph marker                                                       |
+| **Elite**      | **Between normal mob and boss** — not a mini-boss | **Same Enemy AI core as mob** | **Per-move flag** — elite can be knocked down / apply knockdown when move says so | May add cast bar, enhanced telegraph, per-move knockdown/armor, extra moveset |
+| **Boss**       | Stage boss / multi-phase fights                   | Boss state machine + phases   | Per-move + boss rules                                                             | Cast bar, phase transitions (§3.6.9)                                          |
+
+**Elite default:** **no phase system** — elites are tougher mobs with richer telegraphs/movesets, not shrunken bosses.
+
+#### State machine (all enemy tiers)
+
+Core loop:
+
+`Idle → Chase → Telegraph → AttackActive → Recovery → Chase`
+
+Interruption states:
+
+`Hit → (Knockdown → GetUp → Chase)` when rules allow
+
+| State                 | Notes                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| **Telegraph**         | Wind-up; player reads danger before damage                            |
+| **AttackActive**      | Damage window                                                         |
+| **Recovery**          | Punish window                                                         |
+| **Knockdown / GetUp** | Elite/boss (and specific moves) — **not** default for normal mob hits |
+
+**Telegraph feedback layers:**
+
+1. **Ground marker** (required) — on 2.5D floor plane
+2. **Cast bar** (boss / elite)
+3. **Sprite tint** (wind-up → active)
+4. **SFX / screen edge** (optional later; respect `prefers-reduced-motion`)
+
+Each boss attack is its own data row: telegraph/active/recovery duration, shape, interruptible, damage, knockback, knockdown.
+
+### 3.6.9 Boss phase transition (LOCKED)
+
+When HP crosses a threshold (e.g. 50%):
+
+**Do not** cut the current action immediately.
+
+**Flow:** `Current Action → Finish Current Action → PhaseTransition → Invulnerable → Phase 2`
+
+During **PhaseTransition:**
+
+- Boss stops attacking
+- Plays transition animation
+- **Invulnerable**
+- Swaps attack set for new phase
+- Enters Phase 2 only after transition completes
+
+Prevents state-machine collisions between Telegraph/AttackActive/Recovery and phase change.
+
+### 3.6.10 Explicitly OUT of this foundation
+
+Do **not** add while implementing P4/P6 foundation:
+
+- Dash button
+- Soft-target / auto-target / **global** lock-on UI
+- QTE dodge
+- Heavy 3D telegraph VFX (markers + tint first)
+
+Combat remains a **2.5D positioning-based brawler:** player controls **movement + depth + facing + attack timing**.
+
+### 3.6.11 Basic Attack Combo System (LOCKED — HetCreep Ring 0, 2026-08-07)
+
+| Rule                 | Decision                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hit count**        | **3 hits** per combo chain                                                                                                            |
+| **Combo window**     | **Keep current implementation** (~700 ms window per chain step — tune in playtest)                                                    |
+| **Combo reset**      | Stop attacking → may **start again at hit 1** as soon as the next attack input is valid (no extra decay timer beyond recovery/window) |
+| **Finisher (hit 3)** | **Per-character** — defined in each hero's kit data (e.g. stronger, longer range than normals/skills); not one global finisher rule   |
+| **Cancel rules**     | **No cancel** between basic-attack combo and skills (cannot skill-cancel combo or attack-cancel skill)                                |
+| **Input buffer**     | **Keep current** — buffer early input, never skip recovery                                                                            |
+| **Animation**        | **Full sprite set** for every combo phase (startup / active / recovery per hit)                                                       |
+
+### 3.6.12 Initial combat tuning (baseline — playtest & adjust)
+
+HetCreep: set sensible defaults first; **values below are starting points**, not final balance.
+
+| Parameter                          | Initial value                              | Notes                                                              |
+| ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
+| `lungeDistance` (basic, per hit)   | 32 / 36 / 44                               | Hit 1 → 2 → 3; hit 3 slightly longer                               |
+| `hitstunMs` (normal basic on hit)  | 200                                        | Short stun before resume                                           |
+| `knockback` (basic)                | keep `attacks.ts` chain values             | Tune in playtest                                                   |
+| `castDelayMs` S1 / S2 / S3 / Ult   | 0\* / 250 / 320 / 480                      | \*S1 folded into existing startup                                  |
+| `interruptible` (default skill)    | `true` during cast                         | Per-skill override in kit                                          |
+| `interruptible` (Ultimate wind-up) | `false` during clone/setup phase           | Monkey King ult — see §3.7; per-strike phases use `phaseOverrides` |
+| `movementDuringCast` (default)     | `none`                                     | S3 leap uses skill-driven displacement, not free walk              |
+| Mob `telegraphMs`                  | 280                                        | Normal melee enemy                                                 |
+| Boss `telegraphMs`                 | 800–1200                                   | Per attack row                                                     |
+| Knockdown on normal mob            | **no**                                     | P4 mobs use Hit stun only                                          |
+| Knockdown                          | elite/boss + heavy moves + combo finishers | Per move flag                                                      |
+| Boss phase threshold               | **50% HP**                                 | **2 phases** baseline                                              |
+| `getUp` i-frames                   | 200 ms                                     | After knockdown                                                    |
+
+### 3.7 Reference hero kit — หนุมาน / Monkey King (LOCKED baseline)
+
+First vertical-slice kit. Other heroes follow the same **per-hero kit file** pattern.
+
+| Slot         | Name (TH)              | Design                           | Implementation notes                                                                                                                                                   |
+| ------------ | ---------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Basic**    | โจมตีปกติ              | 3-hit combo, multi-target, lunge | §3.6.11; finisher hit 3 tuned per §3.6.12                                                                                                                              |
+| **S1**       | กระบวนทองคำ            | Spinning staff (existing)        | Radial AoE — already shipped                                                                                                                                           |
+| **S2**       | กระบองตีระยะไกล        | Long-range staff strike          | Horizontal or line hit; **no** target lock                                                                                                                             |
+| **S3**       | กระโดดพุ่งทุบ          | Leap jump → slam                 | Skill-driven leap displacement; slam on landing                                                                                                                        |
+| **Ultimate** | แยก 4 ร่าง → พุ่งโจมตี | Clone split → rush               | **`targetLock: 'nearest'`**; clone/setup wind-up **uninterruptible**; each of 4 strike phases follows **per-phase rules** via `phaseOverrides`; not global soft-target |
+
+**Ultimate exception:** only this skill (and future skills explicitly flagged `targetLock: 'nearest'`) may auto-pick a target. Basic attack and S2/S3 still use manual facing/positioning unless their kit row says otherwise.
+
+**Ultimate interrupt model:** `interruptible: false` at move default for clone/setup; strike phases may override individually (e.g. active = interruptible, recovery = not).
+
+**Next design gate (OPEN):** per-hero finisher tuning tables and additional hero kits beyond Monkey King.
 
 ---
 
@@ -153,11 +408,87 @@ Hero Level → Star → Skill Level
 
 **Deferred:** Talent, Awakening, Equipment, Loot affixes, Set bonus.
 
+### 4.2.1 Skill Level (LOCKED architecture — HetCreep Ring 0, 2026-08-07)
+
+> **Closes gap (architecture):** fork issue [#53](https://github.com/nustanakritwithai/GameTurnBase/issues/53)  
+> **Numerical tuning:** P8 design gate — **not Ring 0 locked**
+
+Each hero owns **per-slot skill levels** for S1 / S2 / S3 / Ultimate (independent counters on `OwnedCharacter`).
+
+**Architecture lock (Ring 0):**
+
+| Rule              | Decision                                                                 |
+| ----------------- | ------------------------------------------------------------------------ |
+| Progression scope | **Per-slot** — S1 / S2 / S3 / Ultimate level independently               |
+| Scaling model     | **Data-driven** per skill in kit config — no global hard-coded formula   |
+| Skill definition  | Must support **progression parameters** (e.g. `skillLevelScaling` block) |
+| Scalable outcomes | `damage` / `heal` / `effect` scaling **may** be defined per skill        |
+
+**Kit config shape (structure only — no Ring 0 numbers):**
+
+```ts
+skillLevelScaling?: {
+  damageMultiplierPerLevel?: number
+  healMultiplierPerLevel?: number
+  effectMultiplierPerLevel?: number
+  cooldownReductionMsPerLevel?: number
+  maxBonusCooldownReductionMs?: number
+  scalesCastTiming?: boolean
+}
+```
+
+**Numerical TBD (decide at P8 — do not infer):**
+
+- `maxLevel` per slot
+- damage / heal / effect % per level
+- cooldown scaling amounts
+- cast-delay scaling
+- upgrade costs (gold / materials)
+- progression curve shape
+
+**Rule:** skill level is **per-move data-driven** — do not hard-code one global formula for all heroes/skills.
+
 ## 4.3 Star balance note (LOCKED)
 
 - ★1 must be **fully playable** (complete core kit)
 - Duplicate value via star ascension
 - **Power gap between star tiers must be bounded** — especially for PvP fairness (see §6)
+
+### 4.3.1 Star ascension (LOCKED architecture — HetCreep Ring 0, 2026-08-07)
+
+> **Closes gap (architecture):** fork issue [#54](https://github.com/nustanakritwithai/GameTurnBase/issues/54)  
+> **Numerical tuning:** P9 design gate (with gacha rate/pity — #38) — **do not infer costs**
+
+| Rule              | Decision                                                                       |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Progression model | **Data-driven** star ascension — per-star configuration rows                   |
+| Config shape      | Supports per-tier requirements and stat/effect outcomes                        |
+| Power constraint  | Must satisfy **#35**: bounded star power gap (★6 total stats ≤ **130%** of ★1) |
+
+**Config shape (structure only — no Ring 0 numbers):**
+
+```ts
+starAscensionCosts: Record<
+  number, // target star tier
+  {
+    duplicates?: number
+    materialId?: string
+    materialQty?: number
+    gold?: number
+    statMultiplier?: number
+  }
+>
+```
+
+**Numerical TBD (decide at P9 — do not infer):**
+
+- duplicate requirement per star
+- material / currency costs
+- per-star stat or effect values
+- final ★ cap (if not otherwise locked by a separate Ring 0 decision)
+- exact progression formula coefficients
+
+Gacha pull rates / pity remain **P9** (#38).
 
 ---
 
@@ -173,21 +504,147 @@ Example: 1-1 → 1-2 → 1-3 → 1-4 → 1-5 Boss → Chapter 2 …
 - Pick **one hero** before stage; no mid-stage switch
 - Normal stage target: **2–5 min**; boss: **5–8 min**
 
-## 5.2 Stage design (LOCKED)
+## 5.2 Stage variation types (LOCKED — HetCreep Ring 0, 2026-08-07)
 
-**Not every stage is Wave → Wave → Elite.**
+> **Closes gap:** fork issue [#48](https://github.com/nustanakritwithai/GameTurnBase/issues/48)  
+> **P5 gate:** contract + runtime framework before stage-specific content tuning.
 
-Required **variation** examples:
+**Not every stage is Wave → Wave → Elite.** Goal: **positioning and vertical movement matter** — not repetitive arena waves.
 
-- Survival
-- Defend
-- Chase
-- Hazard
-- Mini-boss
-- Time Attack
-- Custom objectives
+**Architecture rule:** stage type is a **data/config contract** — do **not** create a separate combat engine or AI core per type. Reuse P4 systems (Enemy AI, movement, targeting, damage, interrupt, knockdown) and canonical battle coordinates (§3.1 — hazard zones must use battle X/depth, never raw render Z/Y). Elite/Mini-boss encounters use §3.6.8 Elite contract.
 
-Goal: **positioning and vertical movement matter** — not repetitive arena waves.
+**Stage layer responsibility:**
+
+`Stage Config → Objective → Spawn Rules → Runtime Condition Tracking → Win/Lose Resolution → Stage Result`
+
+### Shared stage contract
+
+Every stage row should conform to this schema (implementation may use TypeScript equivalents):
+
+```ts
+interface StageVariation {
+  stageType: 'survival' | 'defend' | 'chase' | 'hazard' | 'miniBoss' | 'timeAttack' | 'custom'
+
+  winCondition: StageCondition
+  loseCondition: StageCondition
+
+  timer?: {
+    mode: 'none' | 'countdown' | 'countup'
+    timeLimit?: number
+  }
+
+  params: Record<string, unknown>
+
+  spawn?: {
+    pattern: string
+    baseRate?: number
+  }
+}
+```
+
+Numeric values (HP, wave count, spawn rate, timers, difficulty scaling) are **per-stage tuning** — not Ring 0 architecture locks.
+
+### 1. Survival
+
+**Goal:** survive multiple enemy waves.
+
+| Outcome  | Condition                                                       |
+| -------- | --------------------------------------------------------------- |
+| **Win**  | Clear all enemies in the **final** wave (`totalWaves` complete) |
+| **Lose** | Player/party HP = 0                                             |
+
+**Baseline params:** `totalWaves`, `waveInterval`, `timeLimit` (optional), `enemyScaling`, `spawnPattern`
+
+**Rule:** stage ends when the **last wave is cleared**, not when the last wave spawns.
+
+### 2. Defend
+
+**Goal:** protect an objective from enemies.
+
+| Outcome  | Condition                                                                 |
+| -------- | ------------------------------------------------------------------------- |
+| **Win**  | Objective HP > 0 when time expires **or** all reinforcement/waves cleared |
+| **Lose** | `objectiveHP <= 0` **or** player/party wiped                              |
+
+**Baseline params:** `objectiveHP`, `timeLimit`, `enemySpawnRate`, `reinforcementWaves`
+
+### 3. Chase
+
+**Goal:** catch and defeat a target before it escapes.
+
+| Outcome  | Condition                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Win**  | `targetHP <= 0` before target reaches escape point                                                                 |
+| **Lose** | Target reaches `escapeThreshold` / escape point **or** player/party wiped **or** time expires (if `timeLimit` set) |
+
+**Baseline params:** `targetHP`, `escapeThreshold`, `timeLimit` (optional), `spawnBlockers`
+
+### 4. Hazard
+
+**Goal:** fight while managing environmental danger.
+
+**Hazard is a stage modifier** on the primary objective — not a new combat system.
+
+| Outcome  | Condition                                                                       |
+| -------- | ------------------------------------------------------------------------------- |
+| **Win**  | Primary stage objective succeeds                                                |
+| **Lose** | Player/party wiped (enemy or hazard damage) **or** objective fail condition met |
+
+**Baseline params:** `hazardDamagePerSec`, `safeZoneCount`, `hazardPhaseChange`, `timeLimit` (optional)
+
+**Coordinate rule:** hazard zones use §3.1 battle-coordinate contract — combat logic must not use raw render Z/Y.
+
+### 5. Mini-boss
+
+**Goal:** defeat mini-boss / elite encounter(s).
+
+| Outcome  | Condition                                                   |
+| -------- | ----------------------------------------------------------- |
+| **Win**  | All mini-bosses defeated                                    |
+| **Lose** | Player/party wiped **or** time expires (if `timeLimit` set) |
+
+**Baseline params:** `bossHP`, `enrageTimer` (optional), `minionSpawn`, `timeLimit` (optional)
+
+**Rules:** uses P4 enemy/combat schema + §3.6.8 Elite tier — **no new AI core** for this stage type.
+
+### 6. Time Attack
+
+**Goal:** complete objective as fast as possible.
+
+| Outcome  | Condition                                                                               |
+| -------- | --------------------------------------------------------------------------------------- |
+| **Win**  | `targetGoal` achieved                                                                   |
+| **Lose** | Player/party wiped **or** hard time limit reached (when stage uses countdown fail mode) |
+
+**Baseline params:** `targetGoal`, `timeLimit`, `scoreRule`, `comboBonus` (optional)
+
+Time may feed rank/score (clear time, remaining-time bonus).
+
+### 7. Custom
+
+**Use only** when a stage cannot be expressed by the six standard types above.
+
+| Outcome        | Condition                    |
+| -------------- | ---------------------------- |
+| **Win / Lose** | Explicitly defined per stage |
+
+**Baseline params:** `customRulesetId`, `customParams`, `scripts/events`
+
+**Rule:** do **not** use `custom` to bypass standard stage types.
+
+### P5 scope lock
+
+**P5 must implement** stage-variation contract + runtime framework (condition tracking, win/lose resolution).
+
+**P5 does not require yet:**
+
+- Stage-specific cinematics
+- Advanced formations
+- Complex scripted sequences
+- Unique pathing per stage type
+- Custom AI cores
+- Final numerical balancing
+- Full production stage content library
 
 ## 5.3 Rewards (early)
 
@@ -245,24 +702,24 @@ Same 2.5D movement + L/R attack + 3 skills + ultimate as PvE.
 
 Dependency guide — **not** “build everything now”:
 
-| Priority | Track                                                 |
-| -------- | ----------------------------------------------------- |
-| **P0**   | Blueprint v3 (this document)                          |
-| **P1**   | Movement / Depth                                      |
-| **P2**   | Basic Combat (L/R attack, depth alignment, hit model) |
-| **P3**   | 3 Skills + Ultimate framework                         |
-| **P4**   | Enemy AI                                              |
-| **P5**   | Stage 1-1 vertical slice                              |
-| **P6**   | Boss prototype                                        |
-| **P7**   | Chapter / Stage system                                |
-| **P8**   | Hero Level / Skill progression                        |
-| **P9**   | Gacha / Stars                                         |
-| **P10**  | Hero Collection expansion                             |
-| **P11**  | PvE content expansion                                 |
-| **P12**  | PvP prototype                                         |
-| **P13**  | Matchmaking / Rank                                    |
-| **P14**  | Monetization / Shop (basic)                           |
-| **P15**  | Live content                                          |
+| Priority | Track                                                                  |
+| -------- | ---------------------------------------------------------------------- |
+| **P0**   | Blueprint v3 (this document)                                           |
+| **P1**   | Movement / Depth                                                       |
+| **P2**   | Basic Combat (L/R attack, depth alignment, hit model)                  |
+| **P3**   | 3 Skills + Ultimate framework                                          |
+| **P4**   | Enemy AI                                                               |
+| **P5**   | Stage 1-1 vertical slice (§5.2 variation contract + runtime framework) |
+| **P6**   | Boss prototype                                                         |
+| **P7**   | Chapter / Stage system                                                 |
+| **P8**   | Hero Level / Skill progression                                         |
+| **P9**   | Gacha / Stars                                                          |
+| **P10**  | Hero Collection expansion                                              |
+| **P11**  | PvE content expansion                                                  |
+| **P12**  | PvP prototype                                                          |
+| **P13**  | Matchmaking / Rank                                                     |
+| **P14**  | Monetization / Shop (basic)                                            |
+| **P15**  | Live content                                                           |
 
 **Deferred past early phase:** Loot RPG, equipment affix, set bonus, talent, awakening.
 
@@ -276,7 +733,7 @@ Before wide systems:
 - Movement: L/R/U/D + diagonal input; depth alignment
 - Combat: L/R basic attack, **3 skills + ultimate** (no dash button)
 - **2–3 enemy types**
-- **Stage 1-1:** Start → Fight → Clear → EXP/material/currency reward
+- **Stage 1-1:** Start → Fight → Clear → EXP/material/currency reward (may use any §5.2 `stageType` — simplest slice: `survival` or `miniBoss`)
 
 ---
 

@@ -1,0 +1,120 @@
+name: Upstream Skill Watch
+
+# ตรวจ freshtechbro/claudedesignskills (แหล่งของ .claude/skills/react-three-fiber
+# + threejs-webgl ที่ vendor เข้ามา) และ affaan-m/ECC (global rules ที่ cherry-pick มือ
+# ตาม SKILL_REGISTRY.md) ว่ามี commit ใหม่กว่าที่เรารู้ไหม — ถ้ามี เปิด issue แจ้งพร้อมลิงก์
+# compare ให้ไปตรวจว่าควร re-vendor/cherry-pick อัปเดตหรือไม่ ไม่ auto-apply อะไรเอง
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # ทุกวันจันทร์ 03:00 UTC
+  workflow_dispatch:
+
+# เพดานของ workflow เป็นอ่านอย่างเดียว สิทธิ์เขียนประกาศที่ job ที่ต้องใช้จริงเท่านั้น
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: Check upstream skill sources for new commits
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit state.json กลับเข้า repo (step สุดท้าย)
+      issues: write # เปิด/คอมเมนต์ issue แจ้งของใหม่
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: ตรวจ SHA ล่าสุดของแต่ละแหล่ง เทียบกับที่บันทึกไว้
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          STATE=".github/upstream-watch/state.json"
+          UPDATED=false
+          BODY_FILE="$(mktemp)"
+          echo "" > "$BODY_FILE"
+
+          # tr -d '\r' กันเหนียว — jq/gh บาง runner (เช่น Windows local test) แทรก \r
+          # ปนใน raw output ได้ ถึงแม้ ubuntu-latest จริงไม่ควรเจอ
+          for repo in $(jq -r 'keys[]' "$STATE" | tr -d '\r'); do
+            branch="$(jq -r --arg r "$repo" '.[$r].branch' "$STATE" | tr -d '\r')"
+            old_sha="$(jq -r --arg r "$repo" '.[$r].sha' "$STATE" | tr -d '\r')"
+            note="$(jq -r --arg r "$repo" '.[$r].note' "$STATE" | tr -d '\r')"
+
+            new_sha="$(gh api "repos/$repo/commits/$branch" --jq .sha | tr -d '\r')"
+
+            if [ "$new_sha" = "$old_sha" ]; then
+              echo "$repo: ไม่มีอะไรใหม่ ($old_sha)"
+              continue
+            fi
+
+            # compare พังได้จริงถ้า upstream force-push จน old_sha หายไปจากประวัติ (404)
+            # ปล่อยให้ set -e ฆ่า step จะทำให้ watch นี้แดงทุกวันจันทร์จนกว่าจะมีคนแก้
+            # state.json ด้วยมือ — แจ้งเท่าที่รู้แล้วไปต่อดีกว่าหยุดทั้งงาน
+            if compare_json="$(gh api "repos/$repo/compare/$old_sha...$new_sha" 2>/dev/null)"; then
+              ahead_by="$(echo "$compare_json" | jq -r .ahead_by | tr -d '\r')"
+              compare_url="$(echo "$compare_json" | jq -r .html_url | tr -d '\r')"
+            else
+              ahead_by="?"
+              compare_url="https://github.com/$repo/commits/$branch (เทียบตรง ๆ ไม่ได้ — SHA เดิมอาจถูก force-push ทับไปแล้ว)"
+            fi
+
+            echo "$repo: เจอ $ahead_by commit ใหม่ ($old_sha -> $new_sha)"
+            {
+              echo "## \`$repo\`"
+              echo ""
+              echo "- ใช้เพื่อ: $note"
+              echo "- commit ใหม่กว่าที่บันทึกไว้ **$ahead_by** ตัว"
+              echo "- เทียบ: $compare_url"
+              echo "- SHA เดิม -> ใหม่: \`$old_sha\` -> \`$new_sha\`"
+              echo ""
+            } >> "$BODY_FILE"
+
+            jq --arg r "$repo" --arg s "$new_sha" '.[$r].sha = $s' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+            UPDATED=true
+          done
+
+          echo "updated=$UPDATED" >> "$GITHUB_OUTPUT"
+          echo "body_file=$BODY_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: เปิด issue แจ้งถ้ามีของใหม่ (ข้ามถ้ามี issue เปิดค้างอยู่แล้ว)
+        if: steps.check.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # ส่งผ่าน env ไม่แทรก ${{ }} ลงในตัว run โดยตรง — รูปแบบเดียวกับ GH_TOKEN ข้างบน
+          # ค่านี้เป็น path จาก mktemp จึงไม่มีอักขระอันตราย แต่ไม่ทิ้งรูปแบบที่ผิดไว้ให้ลอกต่อ
+          BODY_FILE: ${{ steps.check.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          TITLE="Upstream skill source(s) have new commits"
+          existing="$(gh issue list --search "\"$TITLE\" in:title is:open" --json number --jq '.[0].number // empty')"
+
+          # สร้าง label ถ้ายังไม่มี (idempotent — เงียบถ้ามีอยู่แล้ว) กัน issue create พังเพราะ
+          # label ไม่มีจริงในบาง repo
+          gh label create "dependencies" --color "0366d6" --description "อัปเดตจาก dependency/แหล่งภายนอก" 2>/dev/null || true
+
+          if [ -n "$existing" ]; then
+            echo "issue #$existing เปิดค้างอยู่แล้ว — เพิ่ม comment แทนเปิดใหม่ซ้ำ"
+            gh issue comment "$existing" --body-file "$BODY_FILE"
+          else
+            gh issue create \
+              --title "$TITLE" \
+              --label "dependencies" \
+              --body-file "$BODY_FILE"
+          fi
+
+      - name: บันทึก SHA ใหม่กลับเข้า repo
+        if: steps.check.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/upstream-watch/state.json
+          git commit -m "chore: update upstream-skill-watch state [skip ci]"
+          git push

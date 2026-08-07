@@ -7,25 +7,42 @@
 
 ยังไม่มี
 
-## [0.6.0] - 2026-08-07
+## [0.7.0] - 2026-08-07
 
-Homework delivery — Blueprint v3 P0–P3 (Combat Foundation + Skill framework)
+Blueprint v3 P3 — 3 Skills + Ultimate framework, ตัด dash button + Combat Foundation Design Lock §3.6
 
 ### Added
 
-- **P0** Blueprint v3 docs + governance
-- **P1** 2.5D side-down arena (`battleCoordinates.ts`)
-- **P2** L/R basic attack + depth hit (`combatFacing.ts`)
-- **P3** Skill kit (3 skills + ultimate), ultimate gauge, `SkillBar` UI
+- **Skill kit** — 3 skills + 1 ultimate ต่อฮีโร่ (`skills.ts`, `RealtimeSkillKit`)
+- **Ultimate gauge** — เติมจากการต่อสู้, ใช้เมื่อเต็ม (`ultimateGauge.ts`)
+- **Skill bar UI** — ปุ่ม S1/S2/S3/U แทนปุ่มสกิลเดียว (`SkillBar.tsx`)
+- **Blueprint §3.6 Combat Foundation Design Lock** (docs) — controls, lunge/multi-target, cast interrupt, hit reaction, boss telegraph SM, phase transition — ปิด fork gap [#33](https://github.com/nustanakritwithai/GameTurnBase/issues/33)
+- **Blueprint §3.6.11–§3.7** — combo 3-hit/no-cancel, UI icons, tuning baseline, Monkey King S2/S3/Ult kit
 
 ### Removed
 
-- **Dash button + DashSystem** (Blueprint v3)
+- **Dash button + DashSystem** — ตาม Blueprint v3 (mobility ย้ายเข้าสกิลได้ทีหลัง)
 
 ### Changed
 
-- คีย์บอร์ดสกิล: 1/E, 2/R, 3/F, 4/Q · `skillCooldownsMs` แยกช่อง
-- `.gitignore`: `.cursor/` ทั้งโฟลเดอร์ (`.claude/launch.json` คงเดิม)
+- คีย์บอร์ด: 1/E, 2/R, 3/F, 4/Q สำหรับสกิล; ไม่มี Shift/K หลบแล้ว
+- `skillCooldownsMs` แยกตามช่อง (skill1–3)
+
+## [0.6.0] - 2026-08-07
+
+Blueprint v3.0 รับเป็น Product Baseline เดียว (รวม PR #19 จาก fork `nustanakritwithai/GameTurnBase`) + Combat Foundation P0-P2
+
+### Added
+
+- **Blueprint v3.0** — Universe of Legends baseline, roadmap P0–P15, governance docs
+  (`docs/MASTER_BLUEPRINT_v1.0.md` ถูกลบ — v3.0 เป็นพิมพ์เขียวไฟล์เดียวที่เหลืออยู่)
+- **สนามต่อสู้ 2.5D side-down (P1)** — กล้องมุม brawler, แกน depth, `battleCoordinates.ts`
+- **โจมตีซ้าย/ขวา + depth hit (P2)** — `combatFacing`, hitbox แนวนอน + depth tolerance สำหรับ basic attack
+
+### Changed
+
+- คอมโบผู้เล่นและ melee ศัตรูใช้ hit model แนวนอน (ไม่ใช่กรวย 360°)
+- สกิลหมุนกระบวนทองคำยังเป็น radial 360° ชั่วคราว (รอ P3)
 
 ## [0.5.1] - 2026-08-07
 
@@ -47,18 +64,8 @@ Homework delivery — Blueprint v3 P0–P3 (Combat Foundation + Skill framework)
 
 ## [0.5.0] - 2026-08-07
 
-Combat Foundation (Blueprint v3 P0–P2) + Supabase backend live
-
-### Added
-
-- **Blueprint v3.0** — Universe of Legends baseline, roadmap P0–P15, governance docs
-- **สนามต่อสู้ 2.5D side-down (P1)** — กล้องมุม brawler, แกน depth, `battleCoordinates.ts`
-- **โจมตีซ้าย/ขวา + depth hit (P2)** — `combatFacing`, hitbox แนวนอน + depth tolerance สำหรับ basic attack
-
 ### Changed
 
-- คอมโบผู้เล่นและ melee ศัตรูใช้ hit model แนวนอน (ไม่ใช่กรวย 360°)
-- สกิลหมุนกระบวนทองคำยังเป็น radial 360° ชั่วคราว (รอ P3)
 - **ย้ายระบบบัญชี/ทอง/หยกไป Supabase จริง** — `useAuth.ts` wired; กติกา ledger บังคับที่ Postgres
 - **⚠️ Breaking**: บัญชี/เซฟเก่าใน localStorage ใช้ต่อไม่ได้ ต้องสมัครใหม่
 

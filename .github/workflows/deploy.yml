@@ -1,10 +1,31 @@
 name: Deploy to GitHub Pages
 
-# Fork-only (nustanakritwithai/GameTurnBase)
-# Deploy เฉพาะกิจ — ไม่รันตอน push อัตโนมัติ
-# อยากเทส → ให้ AI / คนกด workflow_dispatch (Actions → Deploy → Run workflow)
+# ปล่อยเว็บเมื่อ "ตั้งใจปล่อย" เท่านั้น ไม่ใช่ทุก push
+#
+# เดิม workflow นี้ยิงทุก commit ที่เข้า master ซึ่งบน repo ที่ push ถี่มากแบบนี้แปลว่า
+# คิว deploy ยาวตลอดเวลาและรันส่วนใหญ่ถูก cancel ทิ้งกลางทางโดยเปล่าประโยชน์ ที่ผ่านมา
+# พยายามแก้ด้วย debounce + queue-check แล้วกลายเป็นหนักกว่าเดิม (ทุกรันเห็นรันใหม่กว่า
+# แล้ว skip หมด เว็บค้างที่ build เก่าทั้งที่รายงาน success — ดู PR #13)
+#
+# กติกาใหม่: **ปล่อยเมื่อเวอร์ชันเกมเปลี่ยน** — `GAME_INFO.version` ใน src/game/gameInfo.ts
+# ซึ่งเป็นเลขที่ผู้เล่นเห็นจริงบนหน้าไตเติลกับหน้าตั้งค่า ไม่ใช่ `package.json` (เลขนั้นเป็น
+# ของ npm package ผู้เล่นไม่เคยเห็น) push ธรรมดากี่ครั้งก็ไม่ deploy อยากปล่อยเมื่อไหร่ก็
+# bump เลขเกมแล้ว push ครั้งเดียว หรือกด Run workflow เอาเองก็ได้
+#
+# สองเลขนี้ต้องตรงกันเสมอ — src/game/gameInfo.test.ts บังคับไว้ ถ้าใครแก้ข้างเดียวเทสต์แดง
+# ก่อนถึง deploy (ci.yml และ step Run Tests ด้านล่างรันตัวเดียวกัน)
+#
+# ผลพลอยได้: ทุกครั้งที่ปล่อยมีเลขเวอร์ชันกำกับจริง จึงตัด GitHub Release พร้อมแนบ SBOM
+# กับ build attestation ไปได้ในคราวเดียว (เดิมสร้างไว้แต่ไม่เคยแนบไปไหน)
 
 on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '**/*.md'
+      - '.agents/**'
+      - '.coalmine.json'
+      - '.github/upstream-watch/**'
   workflow_dispatch:
     inputs:
       force:
@@ -14,14 +35,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages-fork
+  group: 'pages'
   cancel-in-progress: true
 
 jobs:
+  # ด่านแรก ราคาถูก: ตัดสินว่ารอบนี้ควรปล่อยไหม ก่อนจะไปเสียเวลา npm ci + build
   gate:
     name: Check whether the version was bumped
     runs-on: ubuntu-latest
@@ -37,6 +57,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # ต้องมีประวัติไว้เทียบกับจุดก่อน push — fetch-depth ปริยาย (1) ไม่มีอะไรให้เทียบ
+          # และ push เดียวมีได้หลาย commit จึงเอาความลึกคงที่ไม่ได้
           fetch-depth: 0
 
       - name: เทียบเวอร์ชันเกมกับก่อน push
@@ -45,6 +67,8 @@ jobs:
           set -euo pipefail
           GAME_INFO='src/game/gameInfo.ts'
 
+          # อ่านค่าออกจากไฟล์ TS ตรง ๆ ด้วย regex — ไม่ transpile เพื่ออ่านเลขตัวเดียว
+          # ถ้าอ่านไม่ได้ต้องพังเสียงดัง ไม่ใช่เงียบแล้วเดาว่าไม่ต้องปล่อย
           read_version() {
             node -e "
               const src = require('fs').readFileSync(process.argv[1], 'utf8')
@@ -56,22 +80,64 @@ jobs:
 
           version="$(read_version "$GAME_INFO")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "สั่งด้วยมือ — ปล่อยเลย (v$version)"
-          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "สั่งด้วยมือ — ปล่อยเลย (v$version)"
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # เทียบกับจุดก่อน push ไม่ใช่ HEAD~1
+          #
+          # push เดียวมีได้หลาย commit ถ้า bump อยู่ commit กลาง ๆ (เช่นที่ 3 จาก 5)
+          # HEAD~1 จะเห็นเลขใหม่ไปแล้วและสรุปว่า "ไม่เปลี่ยน" — พลาดการปล่อยแบบเงียบ ๆ
+          # github.event.before คือ SHA ของ ref ก่อน push จึงเป็นจุดเทียบที่ถูกต้อง
+          # (เป็นศูนย์ทั้งหมดตอนสร้าง branch ใหม่ กรณีนั้นถือว่าเป็นการปล่อยครั้งแรก)
+          before='${{ github.event.before }}'
+          prev_file="$(mktemp)"
+
+          if [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "$before^{commit}" 2>/dev/null \
+            && git show "$before:$GAME_INFO" > "$prev_file" 2>/dev/null; then
+            previous="$(read_version "$prev_file")"
+          else
+            echo "ไม่มีจุดเทียบก่อน push (branch ใหม่ หรือ commit นั้นหายไปแล้ว) — ถือว่าเป็นการปล่อยครั้งแรก"
+            previous='none'
+          fi
+
+          if [ "$version" = "$previous" ]; then
+            echo "เวอร์ชันเกมยังเป็น $version เท่าเดิม — ไม่ปล่อย (bump ใน $GAME_INFO แล้ว push อีกครั้ง หรือกด Run workflow)"
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "เวอร์ชันเกมเปลี่ยน $previous -> $version — ปล่อย"
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     needs: gate
     if: needs.gate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      # สำหรับ SBOM + build provenance attestation ด้านล่าง (actions/attest)
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
-          cache: npm
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -79,8 +145,17 @@ jobs:
       - name: Lint Code
         run: npm run lint
 
+      # ต้องรันเทสต์ตรงนี้ด้วย ไม่ใช่พึ่ง ci.yml
+      # ci.yml เป็นคนละ workflow ที่ทริกเกอร์ขนานกัน ไม่มี needs/workflow_run ผูกกันไว้
+      # ก่อนหน้านี้ commit ที่เทสต์แดงจึงขึ้น production ได้ เพราะด่านเดียวที่กั้นอยู่คือ
+      # tsc -b ที่อยู่ใน npm run build — เทสต์อย่าง battleAssets.test.ts ที่คอยกันบั๊ก
+      # จอขาวจากไฟล์ภาพหาย ตรวจ path ที่เป็นสตริงล้วน ซึ่ง build มองไม่เห็น
       - name: Run Tests
         run: npm test
+
+      # ไม่รัน build:models ที่นี่ตั้งใจ — ไม่มีโค้ดใน src/ โหลด .glb ใช้ (เกมเรนเดอร์ sprite 2D แทน,
+      # ดู tools/build-models.mjs หัวไฟล์) การรันสคริปต์ยังตรวจสอบใน ci.yml เป็น canary อยู่
+      # รันที่นี่แล้ว copy เข้า dist/ จะสิ้นเปลือง CI minutes + ส่ง asset ที่ไม่มีใครใช้ขึ้น production เปล่า ๆ
 
       - name: Build Application
         env:
@@ -88,14 +163,30 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
+      - name: Generate SBOM
+        run: npm sbom --sbom-format=cyclonedx > sbom.cdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/**'
+
+      - name: Attest SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/**'
+          sbom-path: 'sbom.cdx.json'
+
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: ./dist
+          path: './dist'
 
+      # ส่ง SBOM ต่อให้ job release ด้านล่างแนบเข้า GitHub Release
+      # (เดิม SBOM ถูกสร้างและ attest ทุกครั้งแต่ไม่เคยไปโผล่ที่ไหนให้คนโหลดได้จริง)
       - name: Upload SBOM for the release job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -104,24 +195,43 @@ jobs:
           retention-days: 7
 
   deploy:
-    needs: build
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      # 2026-08-06: ถอด debounce + queue-check — push ถี่ ๆ ทำให้ทุกรัน sleep 30s แล้วเห็นรันใหม่กว่า
+      # in_progress จึง skip deploy ทุกครั้ง (run #88–#100 ข้ามหมด) เว็บค้างที่ build 12:26
+      # ทั้งที่ workflow รายงาน success — พึ่ง concurrency.group + cancel-in-progress แทน
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
         with:
           timeout: 1800000
 
+  # ตัด GitHub Release ให้ทุกเวอร์ชันที่ปล่อยจริง พร้อมแนบ SBOM ให้โหลดได้
+  #
+  # ทำที่นี่ไม่ใช่ workflow แยก เพราะ "ปล่อยเว็บ" กับ "ออกเวอร์ชัน" คือเหตุการณ์เดียวกัน
+  # ตามกติกาใหม่ด้านบนแล้ว แยกออกไปมีแต่จะทำให้สองอย่างหลุดจากกันได้
+  #
+  # ข้ามอย่างเงียบ ๆ ถ้า tag นั้นมี release อยู่แล้ว (เช่นสั่ง Run workflow ซ้ำเวอร์ชันเดิม)
+  # — ไม่ถือเป็นความล้มเหลว
   release:
     name: Publish the GitHub Release for this version
     runs-on: ubuntu-latest
     needs: [ gate, deploy ]
     permissions:
-      contents: write
+      contents: write # สร้าง tag + release
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -149,6 +259,8 @@ jobs:
             exit 0
           fi
 
+          # เนื้อหาดึงจาก CHANGELOG.md ส่วนของเวอร์ชันนี้ ถ้าไม่มีหัวข้อตรงกันก็ปล่อยให้
+          # GitHub สร้างสรุปจาก commit เอง ดีกว่าเขียนข้อความ placeholder ที่ไม่มีใครอัปเดต
           notes_file="$(mktemp)"
           if awk "/^## \[$VERSION\]/{flag=1;next} /^## \[/{flag=0} flag" CHANGELOG.md > "$notes_file" && [ -s "$notes_file" ]; then
             gh release create "$tag" --title "$tag" --notes-file "$notes_file" sbom.cdx.json

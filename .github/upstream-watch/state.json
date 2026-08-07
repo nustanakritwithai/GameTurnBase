@@ -1,0 +1,12 @@
+{
+  "freshtechbro/claudedesignskills": {
+    "branch": "main",
+    "sha": "1da73febff0c3e1dfefc07f8a5ef8f7d1dfdb6cd",
+    "note": "source for .claude/skills/react-three-fiber + threejs-webgl"
+  },
+  "affaan-m/ECC": {
+    "branch": "main",
+    "sha": "623f2c020f052319657674e4e6c29ab5d0ad566b",
+    "note": "global rules cherry-picked manually per SKILL_REGISTRY.md (frozen policy, not vendored in this repo)"
+  }
+}
