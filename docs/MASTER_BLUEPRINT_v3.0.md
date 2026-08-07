@@ -234,7 +234,7 @@ Every attack/skill definition should carry its own data (extend `AttackDefinitio
 
 **Schema rule (LOCKED):** use `interruptible` as the **move-level default**. Add `phaseOverrides` **only** when a specific phase must differ (e.g. uninterruptible clone/setup, then interruptible strike phases). **Do not** require phase-interruptible data on every move — keeps per-move data-driven and scales to boss kits.
 
-**Non-damage / multi-outcome moves (LOCKED — P10 gate, closes #47):**
+**Non-damage / multi-outcome moves (LOCKED architecture — CONFIRMED Ring 0, #47):**
 
 Damage-only moves keep existing hitbox fields — **no `effects[]` required**. When a move heals, buffs, CCs, or summons, add optional `effects[]` (same per-move data-driven pattern as `phaseOverrides`):
 
@@ -408,31 +408,43 @@ Hero Level → Star → Skill Level
 
 **Deferred:** Talent, Awakening, Equipment, Loot affixes, Set bonus.
 
-### 4.2.1 Skill Level (LOCKED — HetCreep Ring 0, 2026-08-07)
+### 4.2.1 Skill Level (LOCKED architecture — HetCreep Ring 0, 2026-08-07)
 
-> **Closes gap:** fork issue [#53](https://github.com/nustanakritwithai/GameTurnBase/issues/53)  
-> **P8 gate:** implementation + tuning table.
+> **Closes gap (architecture):** fork issue [#53](https://github.com/nustanakritwithai/GameTurnBase/issues/53)  
+> **Numerical tuning:** P8 design gate — **not Ring 0 locked**
 
 Each hero owns **per-slot skill levels** for S1 / S2 / S3 / Ultimate (independent counters on `OwnedCharacter`).
 
-| Rule                     | Decision                                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Primary effect**       | **`damageMultiplier`** (or `healMultiplier` for heal skills) scales per skill level — defined per skill in kit config    |
-| **Secondary (optional)** | Per-skill kit may also scale `cooldownReductionMs` and/or `effectAmount` (heal/shield)                                   |
-| **NOT by default**       | `castDelayMs`, `startupMs`, animation phase timing — unchanged unless skill row explicitly sets `scalesCastTiming: true` |
-| **Max skill level**      | **10** per slot (separate from hero level cap 60 — #40)                                                                  |
-| **Upgrade cost**         | Materials + gold per level — **config table, tune at P8**                                                                |
+**Architecture lock (Ring 0):**
 
-**Kit config shape (structure lock):**
+| Rule              | Decision                                                                 |
+| ----------------- | ------------------------------------------------------------------------ |
+| Progression scope | **Per-slot** — S1 / S2 / S3 / Ultimate level independently               |
+| Scaling model     | **Data-driven** per skill in kit config — no global hard-coded formula   |
+| Skill definition  | Must support **progression parameters** (e.g. `skillLevelScaling` block) |
+| Scalable outcomes | `damage` / `heal` / `effect` scaling **may** be defined per skill        |
+
+**Kit config shape (structure only — no Ring 0 numbers):**
 
 ```ts
-skillLevelScaling: {
-  damageMultiplierPerLevel?: number   // e.g. +4% per level — tune at P8
+skillLevelScaling?: {
+  damageMultiplierPerLevel?: number
   healMultiplierPerLevel?: number
+  effectMultiplierPerLevel?: number
   cooldownReductionMsPerLevel?: number
   maxBonusCooldownReductionMs?: number
+  scalesCastTiming?: boolean
 }
 ```
+
+**Numerical TBD (decide at P8 — do not infer):**
+
+- `maxLevel` per slot
+- damage / heal / effect % per level
+- cooldown scaling amounts
+- cast-delay scaling
+- upgrade costs (gold / materials)
+- progression curve shape
 
 **Rule:** skill level is **per-move data-driven** — do not hard-code one global formula for all heroes/skills.
 
@@ -442,36 +454,41 @@ skillLevelScaling: {
 - Duplicate value via star ascension
 - **Power gap between star tiers must be bounded** — especially for PvP fairness (see §6)
 
-### 4.3.1 Star ascension (LOCKED — HetCreep Ring 0, 2026-08-07)
+### 4.3.1 Star ascension (LOCKED architecture — HetCreep Ring 0, 2026-08-07)
 
-> **Closes gap:** fork issue [#54](https://github.com/nustanakritwithai/GameTurnBase/issues/54)  
-> **P9 gate:** economy tuning alongside gacha rate/pity (#38).
+> **Closes gap (architecture):** fork issue [#54](https://github.com/nustanakritwithai/GameTurnBase/issues/54)  
+> **Numerical tuning:** P9 design gate (with gacha rate/pity — #38) — **do not infer costs**
 
-| Rule                   | Decision                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| **Max star**           | **★6**                                                                               |
-| **Ascension material** | **1 duplicate** of same `characterId` per +1 star (★n → ★n+1)                        |
-| **Duplicates at ★6**   | Convert to **hero shards** (same character) — shard uses deferred to P9 economy pass |
-| **Optional soft cost** | Gold + materials per ascension allowed via config — amounts tune at P9               |
-| **Stat scaling**       | Bounded by #35: **★6 total stats ≤ 130% of ★1**                                      |
+| Rule              | Decision                                                                       |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Progression model | **Data-driven** star ascension — per-star configuration rows                   |
+| Config shape      | Supports per-tier requirements and stat/effect outcomes                        |
+| Power constraint  | Must satisfy **#35**: bounded star power gap (★6 total stats ≤ **130%** of ★1) |
 
-**Default stat multiplier formula (structure lock, tune coefficients at P9):**
-
-```
-statMultiplier(star) = 1 + (star − 1) × 0.06    // ★1=1.00 … ★6=1.30
-```
-
-**Config shape:**
+**Config shape (structure only — no Ring 0 numbers):**
 
 ```ts
 starAscensionCosts: Record<
-  2 | 3 | 4 | 5 | 6,
-  { duplicates: number; gold?: number; materialId?: string; materialQty?: number }
+  number, // target star tier
+  {
+    duplicates?: number
+    materialId?: string
+    materialQty?: number
+    gold?: number
+    statMultiplier?: number
+  }
 >
-// Ring 0 default: duplicates = 1 for each tier ★2–★6; gold/material optional
 ```
 
-**Rule:** duplicate-to-star is **config-driven** — the `1 duplicate = +1 star` default is the initial baseline, not a hard-coded engine constant. Gacha pull rates/pity remain **P9** (#38).
+**Numerical TBD (decide at P9 — do not infer):**
+
+- duplicate requirement per star
+- material / currency costs
+- per-star stat or effect values
+- final ★ cap (if not otherwise locked by a separate Ring 0 decision)
+- exact progression formula coefficients
+
+Gacha pull rates / pity remain **P9** (#38).
 
 ---
 
