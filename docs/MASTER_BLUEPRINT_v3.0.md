@@ -397,21 +397,147 @@ Example: 1-1 → 1-2 → 1-3 → 1-4 → 1-5 Boss → Chapter 2 …
 - Pick **one hero** before stage; no mid-stage switch
 - Normal stage target: **2–5 min**; boss: **5–8 min**
 
-## 5.2 Stage design (LOCKED)
+## 5.2 Stage variation types (LOCKED — HetCreep Ring 0, 2026-08-07)
 
-**Not every stage is Wave → Wave → Elite.**
+> **Closes gap:** fork issue [#48](https://github.com/nustanakritwithai/GameTurnBase/issues/48)  
+> **P5 gate:** contract + runtime framework before stage-specific content tuning.
 
-Required **variation** examples:
+**Not every stage is Wave → Wave → Elite.** Goal: **positioning and vertical movement matter** — not repetitive arena waves.
 
-- Survival
-- Defend
-- Chase
-- Hazard
-- Mini-boss
-- Time Attack
-- Custom objectives
+**Architecture rule:** stage type is a **data/config contract** — do **not** create a separate combat engine or AI core per type. Reuse P4 systems (Enemy AI, movement, targeting, damage, interrupt, knockdown) and canonical battle coordinates (§3.1 — hazard zones must use battle X/depth, never raw render Z/Y). Elite/Mini-boss encounters use §3.6.8 Elite contract.
 
-Goal: **positioning and vertical movement matter** — not repetitive arena waves.
+**Stage layer responsibility:**
+
+`Stage Config → Objective → Spawn Rules → Runtime Condition Tracking → Win/Lose Resolution → Stage Result`
+
+### Shared stage contract
+
+Every stage row should conform to this schema (implementation may use TypeScript equivalents):
+
+```ts
+interface StageVariation {
+  stageType: 'survival' | 'defend' | 'chase' | 'hazard' | 'miniBoss' | 'timeAttack' | 'custom'
+
+  winCondition: StageCondition
+  loseCondition: StageCondition
+
+  timer?: {
+    mode: 'none' | 'countdown' | 'countup'
+    timeLimit?: number
+  }
+
+  params: Record<string, unknown>
+
+  spawn?: {
+    pattern: string
+    baseRate?: number
+  }
+}
+```
+
+Numeric values (HP, wave count, spawn rate, timers, difficulty scaling) are **per-stage tuning** — not Ring 0 architecture locks.
+
+### 1. Survival
+
+**Goal:** survive multiple enemy waves.
+
+| Outcome  | Condition                                                       |
+| -------- | --------------------------------------------------------------- |
+| **Win**  | Clear all enemies in the **final** wave (`totalWaves` complete) |
+| **Lose** | Player/party HP = 0                                             |
+
+**Baseline params:** `totalWaves`, `waveInterval`, `timeLimit` (optional), `enemyScaling`, `spawnPattern`
+
+**Rule:** stage ends when the **last wave is cleared**, not when the last wave spawns.
+
+### 2. Defend
+
+**Goal:** protect an objective from enemies.
+
+| Outcome  | Condition                                                                 |
+| -------- | ------------------------------------------------------------------------- |
+| **Win**  | Objective HP > 0 when time expires **or** all reinforcement/waves cleared |
+| **Lose** | `objectiveHP <= 0` **or** player/party wiped                              |
+
+**Baseline params:** `objectiveHP`, `timeLimit`, `enemySpawnRate`, `reinforcementWaves`
+
+### 3. Chase
+
+**Goal:** catch and defeat a target before it escapes.
+
+| Outcome  | Condition                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Win**  | `targetHP <= 0` before target reaches escape point                                                                 |
+| **Lose** | Target reaches `escapeThreshold` / escape point **or** player/party wiped **or** time expires (if `timeLimit` set) |
+
+**Baseline params:** `targetHP`, `escapeThreshold`, `timeLimit` (optional), `spawnBlockers`
+
+### 4. Hazard
+
+**Goal:** fight while managing environmental danger.
+
+**Hazard is a stage modifier** on the primary objective — not a new combat system.
+
+| Outcome  | Condition                                                                       |
+| -------- | ------------------------------------------------------------------------------- |
+| **Win**  | Primary stage objective succeeds                                                |
+| **Lose** | Player/party wiped (enemy or hazard damage) **or** objective fail condition met |
+
+**Baseline params:** `hazardDamagePerSec`, `safeZoneCount`, `hazardPhaseChange`, `timeLimit` (optional)
+
+**Coordinate rule:** hazard zones use §3.1 battle-coordinate contract — combat logic must not use raw render Z/Y.
+
+### 5. Mini-boss
+
+**Goal:** defeat mini-boss / elite encounter(s).
+
+| Outcome  | Condition                                                   |
+| -------- | ----------------------------------------------------------- |
+| **Win**  | All mini-bosses defeated                                    |
+| **Lose** | Player/party wiped **or** time expires (if `timeLimit` set) |
+
+**Baseline params:** `bossHP`, `enrageTimer` (optional), `minionSpawn`, `timeLimit` (optional)
+
+**Rules:** uses P4 enemy/combat schema + §3.6.8 Elite tier — **no new AI core** for this stage type.
+
+### 6. Time Attack
+
+**Goal:** complete objective as fast as possible.
+
+| Outcome  | Condition                                                                               |
+| -------- | --------------------------------------------------------------------------------------- |
+| **Win**  | `targetGoal` achieved                                                                   |
+| **Lose** | Player/party wiped **or** hard time limit reached (when stage uses countdown fail mode) |
+
+**Baseline params:** `targetGoal`, `timeLimit`, `scoreRule`, `comboBonus` (optional)
+
+Time may feed rank/score (clear time, remaining-time bonus).
+
+### 7. Custom
+
+**Use only** when a stage cannot be expressed by the six standard types above.
+
+| Outcome        | Condition                    |
+| -------------- | ---------------------------- |
+| **Win / Lose** | Explicitly defined per stage |
+
+**Baseline params:** `customRulesetId`, `customParams`, `scripts/events`
+
+**Rule:** do **not** use `custom` to bypass standard stage types.
+
+### P5 scope lock
+
+**P5 must implement** stage-variation contract + runtime framework (condition tracking, win/lose resolution).
+
+**P5 does not require yet:**
+
+- Stage-specific cinematics
+- Advanced formations
+- Complex scripted sequences
+- Unique pathing per stage type
+- Custom AI cores
+- Final numerical balancing
+- Full production stage content library
 
 ## 5.3 Rewards (early)
 
@@ -469,24 +595,24 @@ Same 2.5D movement + L/R attack + 3 skills + ultimate as PvE.
 
 Dependency guide — **not** “build everything now”:
 
-| Priority | Track                                                 |
-| -------- | ----------------------------------------------------- |
-| **P0**   | Blueprint v3 (this document)                          |
-| **P1**   | Movement / Depth                                      |
-| **P2**   | Basic Combat (L/R attack, depth alignment, hit model) |
-| **P3**   | 3 Skills + Ultimate framework                         |
-| **P4**   | Enemy AI                                              |
-| **P5**   | Stage 1-1 vertical slice                              |
-| **P6**   | Boss prototype                                        |
-| **P7**   | Chapter / Stage system                                |
-| **P8**   | Hero Level / Skill progression                        |
-| **P9**   | Gacha / Stars                                         |
-| **P10**  | Hero Collection expansion                             |
-| **P11**  | PvE content expansion                                 |
-| **P12**  | PvP prototype                                         |
-| **P13**  | Matchmaking / Rank                                    |
-| **P14**  | Monetization / Shop (basic)                           |
-| **P15**  | Live content                                          |
+| Priority | Track                                                                  |
+| -------- | ---------------------------------------------------------------------- |
+| **P0**   | Blueprint v3 (this document)                                           |
+| **P1**   | Movement / Depth                                                       |
+| **P2**   | Basic Combat (L/R attack, depth alignment, hit model)                  |
+| **P3**   | 3 Skills + Ultimate framework                                          |
+| **P4**   | Enemy AI                                                               |
+| **P5**   | Stage 1-1 vertical slice (§5.2 variation contract + runtime framework) |
+| **P6**   | Boss prototype                                                         |
+| **P7**   | Chapter / Stage system                                                 |
+| **P8**   | Hero Level / Skill progression                                         |
+| **P9**   | Gacha / Stars                                                          |
+| **P10**  | Hero Collection expansion                                              |
+| **P11**  | PvE content expansion                                                  |
+| **P12**  | PvP prototype                                                          |
+| **P13**  | Matchmaking / Rank                                                     |
+| **P14**  | Monetization / Shop (basic)                                            |
+| **P15**  | Live content                                                           |
 
 **Deferred past early phase:** Loot RPG, equipment affix, set bonus, talent, awakening.
 
@@ -500,7 +626,7 @@ Before wide systems:
 - Movement: L/R/U/D + diagonal input; depth alignment
 - Combat: L/R basic attack, **3 skills + ultimate** (no dash button)
 - **2–3 enemy types**
-- **Stage 1-1:** Start → Fight → Clear → EXP/material/currency reward
+- **Stage 1-1:** Start → Fight → Clear → EXP/material/currency reward (may use any §5.2 `stageType` — simplest slice: `survival` or `miniBoss`)
 
 ---
 
