@@ -230,8 +230,39 @@ Every attack/skill definition should carry its own data (extend `AttackDefinitio
 | `knockdown`                             | Whether this move can knock down                                                                                                                           |
 | `multiTarget`                           | Hit all in box vs single target (basic = true)                                                                                                             |
 | `hitShape` / `range` / `depthTolerance` | Hit geometry (existing P2 model)                                                                                                                           |
+| `effects`                               | **Optional** — non-damage or supplemental move outcomes (see below)                                                                                        |
 
 **Schema rule (LOCKED):** use `interruptible` as the **move-level default**. Add `phaseOverrides` **only** when a specific phase must differ (e.g. uninterruptible clone/setup, then interruptible strike phases). **Do not** require phase-interruptible data on every move — keeps per-move data-driven and scales to boss kits.
+
+**Non-damage / multi-outcome moves (LOCKED — P10 gate, closes #47):**
+
+Damage-only moves keep existing hitbox fields — **no `effects[]` required**. When a move heals, buffs, CCs, or summons, add optional `effects[]` (same per-move data-driven pattern as `phaseOverrides`):
+
+```ts
+type MoveEffectKind = 'damage' | 'heal' | 'buff' | 'debuff' | 'cc' | 'summon'
+
+interface MoveEffect {
+  kind: MoveEffectKind
+  target:
+    'self' | 'singleEnemy' | 'nearestEnemy' | 'allEnemies' | 'singleAlly' | 'allAllies' | 'aoe'
+  amount?: number
+  buffId?: string
+  durationMs?: number
+  ccType?: 'stun' | 'slow' | 'root' | 'silence'
+  summonEntityId?: string
+  summonMaxActive?: number
+  summonDurationMs?: number
+}
+```
+
+| Archetype (§4.1)                    | Typical `effects` usage       | Combat engine                                            |
+| ----------------------------------- | ----------------------------- | -------------------------------------------------------- |
+| Fighter / Ranged / Assassin / Heavy | damage via hitbox (existing)  | unchanged                                                |
+| Control                             | `cc` / `debuff` on hit or AoE | reuse hit reaction + existing state machine              |
+| Support                             | `heal` / `buff` on allies     | same targeting/range rules as attacks (§3.1 coords)      |
+| Summoner                            | `summon` spawns entity        | reuse spawn/entity pool — **no summon-specific AI core** |
+
+Hero kit files add `archetype` metadata; **move schema stays shared** across all archetypes.
 
 **P4 enemy moves use the same schema** as player attacks/skills.
 
@@ -377,11 +408,70 @@ Hero Level → Star → Skill Level
 
 **Deferred:** Talent, Awakening, Equipment, Loot affixes, Set bonus.
 
+### 4.2.1 Skill Level (LOCKED — HetCreep Ring 0, 2026-08-07)
+
+> **Closes gap:** fork issue [#53](https://github.com/nustanakritwithai/GameTurnBase/issues/53)  
+> **P8 gate:** implementation + tuning table.
+
+Each hero owns **per-slot skill levels** for S1 / S2 / S3 / Ultimate (independent counters on `OwnedCharacter`).
+
+| Rule                     | Decision                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **Primary effect**       | **`damageMultiplier`** (or `healMultiplier` for heal skills) scales per skill level — defined per skill in kit config    |
+| **Secondary (optional)** | Per-skill kit may also scale `cooldownReductionMs` and/or `effectAmount` (heal/shield)                                   |
+| **NOT by default**       | `castDelayMs`, `startupMs`, animation phase timing — unchanged unless skill row explicitly sets `scalesCastTiming: true` |
+| **Max skill level**      | **10** per slot (separate from hero level cap 60 — #40)                                                                  |
+| **Upgrade cost**         | Materials + gold per level — **config table, tune at P8**                                                                |
+
+**Kit config shape (structure lock):**
+
+```ts
+skillLevelScaling: {
+  damageMultiplierPerLevel?: number   // e.g. +4% per level — tune at P8
+  healMultiplierPerLevel?: number
+  cooldownReductionMsPerLevel?: number
+  maxBonusCooldownReductionMs?: number
+}
+```
+
+**Rule:** skill level is **per-move data-driven** — do not hard-code one global formula for all heroes/skills.
+
 ## 4.3 Star balance note (LOCKED)
 
 - ★1 must be **fully playable** (complete core kit)
 - Duplicate value via star ascension
 - **Power gap between star tiers must be bounded** — especially for PvP fairness (see §6)
+
+### 4.3.1 Star ascension (LOCKED — HetCreep Ring 0, 2026-08-07)
+
+> **Closes gap:** fork issue [#54](https://github.com/nustanakritwithai/GameTurnBase/issues/54)  
+> **P9 gate:** economy tuning alongside gacha rate/pity (#38).
+
+| Rule                   | Decision                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| **Max star**           | **★6**                                                                               |
+| **Ascension material** | **1 duplicate** of same `characterId` per +1 star (★n → ★n+1)                        |
+| **Duplicates at ★6**   | Convert to **hero shards** (same character) — shard uses deferred to P9 economy pass |
+| **Optional soft cost** | Gold + materials per ascension allowed via config — amounts tune at P9               |
+| **Stat scaling**       | Bounded by #35: **★6 total stats ≤ 130% of ★1**                                      |
+
+**Default stat multiplier formula (structure lock, tune coefficients at P9):**
+
+```
+statMultiplier(star) = 1 + (star − 1) × 0.06    // ★1=1.00 … ★6=1.30
+```
+
+**Config shape:**
+
+```ts
+starAscensionCosts: Record<
+  2 | 3 | 4 | 5 | 6,
+  { duplicates: number; gold?: number; materialId?: string; materialQty?: number }
+>
+// Ring 0 default: duplicates = 1 for each tier ★2–★6; gold/material optional
+```
+
+**Rule:** duplicate-to-star is **config-driven** — the `1 duplicate = +1 star` default is the initial baseline, not a hard-coded engine constant. Gacha pull rates/pity remain **P9** (#38).
 
 ---
 
