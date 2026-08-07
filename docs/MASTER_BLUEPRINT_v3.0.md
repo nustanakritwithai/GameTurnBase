@@ -25,7 +25,7 @@
 
 ## One-line definition (LOCKED)
 
-> **Legend of Soul TH** is a **Stage-based 2.5D Hero Collection Action RPG** using **2D HD Sprites** from diverse literature and legends. Players move up/down/left/right to align attacks, fight with **Basic Attack + 3 Skills + Ultimate**, clear stages and bosses, collect heroes via gacha, raise stars and develop characters, then enter **1v1 Ranked PvP** later.
+> **Legend of Soul TH** is a **Thai Mythic Fantasy** **Stage-based 2.5D Hero Collection Action RPG** — a contemporary fantasy universe rooted in **Thai identity**, where folklore, spirits, literature, and myths from many cultures coexist. Players fight with **Basic Attack + 3 Skills + Ultimate**, clear stages and bosses, collect heroes via gacha, raise stars, then enter **1v1 Ranked PvP** later. **Ramakien is one major myth arc — not the whole game.**
 
 ---
 
@@ -41,18 +41,148 @@
 
 Combat genre: **Stage-based 2.5D Action RPG** — realtime, positioning-based, mobile-friendly.
 
-## 1.2 Universe of Legends (LOCKED)
+## 1.2 Core theme (LOCKED — HetCreep Ring 0, 2026-08-07)
 
-The game is **not** “Ramakien only.”
+**Legend of Soul TH is not a Ramakien game.**
 
-- **Brand framing:** **Universe of Legends** — heroes from literature, myth, and public-domain character sets.
-- **Ramakien** may be the **first Chapter / Series** — not the entire product ceiling.
-- Hero roster must scale to **many distinct characters** — art capacity is **not** the primary bottleneck; **gameplay identity** is.
+| Frame          | Decision                                                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What it is** | **Thai Mythic Fantasy Universe** — contemporary fantasy with **Thailand and Thai identity at the center**, open to legends, beliefs, spirits, and literature from many cultures in one world |
+| **Keywords**   | Thai Identity × Contemporary Fantasy × Folklore × Spirits × Mythology × Literature                                                                                                           |
+| **Ramakien**   | One **major myth arc / content pillar** — not the theme of the entire product                                                                                                                |
+| **Principle**  | **Thai is the identity, not the limitation.** Thai roots the world and art direction; not every character must be Thai                                                                       |
 
-## 1.3 Visual standard
+**Brand sentence (LOCKED):**
+
+> Legend of Soul TH คือจักรวาล Action Fantasy ที่สร้างโลกกลางจากความเป็นไทย แล้วเปิดประตูให้ผี ความเชื่อ วรรณคดี ตำนาน และวีรบุรุษจากหลากหลายโลกเข้ามามีชีวิตและต่อสู้ร่วมกัน
+
+**Forbidden product framings (do not use in docs, marketing, or design briefs):**
+
+- ❌ Ramakien Game / เกมรามเกียรติ์
+- ❌ เกมรวมตัวละครวรรณคดี (generic literature crossover)
+- ❌ เกมไซอิ๋ว / Journey to the West game
+- ❌ เกมผีไทย (Thai ghost game only)
+
+**Use instead:** **Thai Mythic Universe** / **Contemporary Thai Mythic Fantasy**
+
+## 1.3 World foundation (LOCKED)
+
+The main world is **fictional**, rooted in Thailand — **not** a 1:1 map of modern Thailand and **not** locked to the Ramakien era.
+
+It may include (coexisting under one art direction): modern cities, Thai communities, temples, shrines, markets, Thai houses, forests, rivers, ancient cities, technology, amulets, occult practice, the spirit world, and supernatural realms.
+
+**Player feeling target:** _“This is a fantasy universe born from Thai imagination and culture”_ — without forcing everything to be ancient Thai.
+
+### Central hub — นครอาคม (working name, LOCKED concept)
+
+**นครอาคม** is the game's **original central city** — a fictional Thai city in a near-contemporary or near-future setting, built at a junction of realms:
+
+```
+Human World  ↔  Spirit World  ↔  Mythic Realms
+```
+
+An event is **breaking the boundaries** between these layers. Stories, beliefs, literature, legends, and ghost lore that once lived only in narrative are **manifesting in the human world**. นครอาคม is the **central hub** of the universe.
+
+### Universe rule (LOCKED)
+
+> _“Stories that humans believe and pass down can exist in another layer of the world.”_
+
+Belief, legend, and folklore are not mere fiction — they can create or sustain **Soul / Mythic Soul**. When balance between realms fails, these beings can cross into the human world. This is the **in-universe reason** heroes from different eras, stories, and cultures can coexist.
+
+## 1.4 Character universe (LOCKED)
+
+Heroes are **not** limited to Ramakien. Sources:
+
+| Source                      | Examples                                                                                          | Notes                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Thai Literature**         | หนุมาน, ทศกัณฐ์, พระอภัยมณี, สุดสาคร                                                              | Ramakien lives **here** — one literature bucket, not the whole IP                                                                                           |
+| **Thai Folklore / Ghosts**  | กระสือ, กระหัง, ผีปอบ, ผีตายโหง, guardian spirits                                                 | May become Hero, Enemy, or NPC                                                                                                                              |
+| **Occult / Mystic**         | หมอผี, นักสักยันต์, amulet users, spirit hunters, sealers                                         | Strong fit for **original characters**                                                                                                                      |
+| **Thai Mythical Creatures** | นาค, ครุฑ, กินรี, ยักษ์, สิงห์, Himmapan beasts                                                   | Reinterpret for contemporary fantasy                                                                                                                        |
+| **Regional Beliefs**        | North / Isan / Central / South Thai traditions                                                    | Each region may have distinct visual + myth identity                                                                                                        |
+| **Foreign Legends**         | ซุนหงอคง, ตือโป๊ยก่าย, ซัวเจ๋ง (Journey to the West); future Chinese, Indian, Japanese, SEA myths | Must pass **Legend of Soul TH art direction** — not a random crossover                                                                                      |
+| **Original Heroes**         | Game-created cast                                                                                 | Inspired by Thai culture, beliefs, professions, cities, history, fantasy, contemporary Thailand — **equal importance to legend-based heroes in main story** |
+
+## 1.5 Main team & story backbone (LOCKED)
+
+The **main playable team should not be a Ramakien party.** Core cast = **original Legend of Soul TH characters** who guide the player through the universe.
+
+**Example team structure (directional, not final roster lock):**
+
+| Role          | Archetype                                                      |
+| ------------- | -------------------------------------------------------------- |
+| Spirit Hunter | Modern human proxy / player lens                               |
+| Mystic        | Rules of spirits, yantra, spells, sealing                      |
+| Guardian      | Warrior empowered by supernatural forces or ancient protectors |
+| Spirit Hero   | e.g. กระสือ — human vessel, combat form-shifts                 |
+
+**Legendary characters** (หนุมาน, ทศกัณฐ์, ซุนหงอคง, etc.) join via **story arcs** — preserving **Legend of Soul TH** as the primary IP.
+
+### Story structure (LOCKED direction)
+
+Main story **does not** retell Ramakien from scratch. It starts in the **present-day game world**.
+
+**Opening arc — นครอาคม:** supernatural incidents across the city → spirits in urban areas → ancient objects awakening → mythic beings appearing → main team investigates → discovery: **the borders between human, spirit, and mythic realms are collapsing**.
+
+**Example arc expansion (order not fixed):** นครอาคม → Thai folk spirits → occult → Naga → Himmapan → **Ramakien Arc** → **Journey to the West Arc** → international myth arcs.
+
+### Myth arc positions (LOCKED)
+
+| Arc                                  | Status                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Ramakien**                         | Major **Mythic Realm / Story Arc** — หนุมาน, ทศกัณฐ์, ลังกา as heroes/bosses/stages **within** the universe                  |
+| **Journey to the West**              | **Foreign / Eastern Legends** arc — existing ไซอิ๋ว cast stays; lore: when mythic walls fail, **non-Thai legends cross too** |
+| **Original world + Original heroes** | **Core IP backbone**                                                                                                         |
+
+## 1.6 Art direction (LOCKED)
+
+**Not:** pure Traditional Thai everywhere · **Not:** generic anime fantasy with Thai patterns pasted on.
+
+**Target:** **Contemporary Thai Mythic Fantasy**
+
+Express Thai identity through: silhouette, architecture, pattern, textile, jewelry, weapon design, tattoos/yantra, amulets, religious/folk objects, environment, color/material, creature design — reinterpreted as game fantasy.
+
+Characters may mix: jacket + yantra · streetwear + amulets · combat gear + Thai motifs · traditional elements + fantasy armor — **full traditional dress not required on every hero**.
+
+### Visual production standard
 
 - **2D HD Sprite** characters in combat — **not** 3D / GLB character pipeline.
 - Lobby/environment 3D (if any) is presentation only — not the character production path.
+
+## 1.7 Hero design gate (LOCKED)
+
+Before adding any hero, answer:
+
+1. **Source?** Thai / Regional / Foreign / Original
+2. **Why do they belong in Legend of Soul TH?** Must be explainable via world lore (§1.3–§1.4)
+3. **Do they share visual identity?** Must look like one game — not unrelated crossover skins
+
+## 1.8 Content expansion principle (LOCKED)
+
+Universe structure must support long-term seasons/expansions — one theme per expansion, e.g.:
+
+| Season (example)      | Theme                     |
+| --------------------- | ------------------------- |
+| Spirits of Siam       | Thai ghosts & occult      |
+| Forest of Himmapan    | Himmapan creatures        |
+| War of Lanka          | Ramakien                  |
+| Monkey King's Arrival | Journey to the West       |
+| Serpent Kingdom       | Naga & Mekong river myths |
+
+New heroes, stages, enemies, and story can grow **without changing core theme** (§1.2).
+
+## 1.9 IP layer map (LOCKED summary)
+
+| Layer                       | Role                |
+| --------------------------- | ------------------- |
+| **Original Thai World**     | Core                |
+| **Thai Folklore & Beliefs** | Identity            |
+| **Ramakien**                | Major Myth Arc      |
+| **Journey to the West**     | Foreign Myth Arc    |
+| **Other Legends**           | Future expansion    |
+| **Original Heroes**         | Main story backbone |
+
+_Supersedes prior “Universe of Legends” one-liner-only framing — that phrase may remain as secondary/marketing alias but **Thai Mythic Fantasy Universe** is the canonical theme lock._
 
 ---
 
@@ -761,15 +891,16 @@ Before wide systems:
 
 # §14 — Superseded directions (history)
 
-| Prior                                                 | Status                           |
-| ----------------------------------------------------- | -------------------------------- |
-| Blueprint v1.0 (premium, dungeon-only)                | SUPERSEDED                       |
-| Blueprint v2.0 (4 skills + dash, loot RPG in roadmap) | SUPERSEDED by v3                 |
-| Turn-based                                            | SUPERSEDED                       |
-| Top-down combat                                       | LEGACY in code — migrate         |
-| 360° attack                                           | SUPERSEDED                       |
-| Ramakien-only product ceiling                         | SUPERSEDED → Universe of Legends |
+| Prior                                                 | Status                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| Blueprint v1.0 (premium, dungeon-only)                | SUPERSEDED                                                     |
+| Blueprint v2.0 (4 skills + dash, loot RPG in roadmap) | SUPERSEDED by v3                                               |
+| Turn-based                                            | SUPERSEDED                                                     |
+| Top-down combat                                       | LEGACY in code — migrate                                       |
+| 360° attack                                           | SUPERSEDED                                                     |
+| Ramakien-only product ceiling                         | SUPERSEDED → Thai Mythic Fantasy Universe (§1.2)               |
+| “Universe of Legends” as sole theme framing           | SUPERSEDED → §1.2–§1.9 theme lock (phrase may remain as alias) |
 
 ---
 
-_Operator: HetCreep · Agent: Cursor Agent (cloud) · 2026-08-07_
+_Operator: HetCreep · Agent: Cursor Agent (cloud) · 2026-08-07 (theme lock §1.2–§1.9)_
