@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-07T20:15:00+07:00 by `Cursor Agent (cloud)` (completed missing issue comments — damage formula, entity states, #43 resolved, master #33 summary)
+> **Last Updated**: 2026-08-07T20:25:00+07:00 by `Cursor Agent (cloud)` (#38 Gacha direction locked — deferred P9, no rate/pity numbers)
 > **RULES_VERSION last synced: 17** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
@@ -41,7 +41,7 @@
 - **Real backend: Supabase LIVE (2026-08-07)**: `useAuth.ts` wired to Supabase Auth + Postgres RPCs (`earn_gold`/`grant_item`/`redeem_coupon`/`grant_character`, all `SECURITY DEFINER` so ledger rules are DB-enforced) — localStorage accounts discarded (accepted trade-off, few/no real players on a brand-new project). `accountRepository.ts` stays in the tree as an untouched fallback seam only. CI injects `VITE_SUPABASE_*` at build (org-level secret, item 87); `main.tsx` dynamic-imports `App` so a missing/rotated secret degrades to a fallback screen instead of a blank page (item 88).
 - **Master Blueprint v3.0**: P0–P3 DONE · §3.6–§3.7 LOCKED · **P4 design CLEAR** — #36 Telegraph state + `stageConfig` data-driven ranges (ไม่ใช่ global 420/115) · #41 hitstun **200ms** (sync code จาก 180) · #34 depthTolerance 95/100/105/88 + S2/S3 92/110 · #42 gauge-only · **NEXT: P4 implement**
 - **Battle (CURRENT)**: realtime · 2.5D side-down · L/R + lunge · 3 skills + ultimate (P3) · no global soft-target (#33 Attack Snap superseded); **Ult skill-only lock** (หนุมาน §3.7)
-- **P8/P13 baselines locked (issue comment, ไม่ implement ยัง)**: #35 ★6 stat ≤130% ★1 · #40 level cap 60 · #39 Elo/7-tier/K32 · #44 client-predict+server-reconcile @ P12 · #38 gacha deferred P9 · per-hero finisher numbers still OPEN
+- **P8/P13 baselines locked (issue comment, ไม่ implement ยัง)**: #35 ★6 stat ≤130% ★1 · #40 level cap 60 · #39 Elo/7-tier/K32 · #44 client-predict+server-reconcile @ P12 · **#38 gacha** direction locked (gems pull, config-driven, server-authoritative, `CurrencyShopModal`=demo only) — **rate/pity/cost ยังไม่ lock, P9 design gate** · per-hero finisher numbers still OPEN
 
 - **Blueprint gap closure — full 8-track sweep DONE (2026-08-07)**: HetCreep's rule — verify each blueprint PART against actually-shipped code (not just trust the gap analysis's own claims), classify per `master-blueprint-law.md` (a docs/governance pass does NOT implement combat/dungeon/hero/loot/gacha/progression/AI/boss/town/quest), file every real conflict as an issue on `nustanakritwithai/GameTurnBase` (explicitly NOT this repo — this repo stays docs-only for this sweep). Solo, no ultracode workflow (declined). Sequencing was the agent's call: docs debt (lowest risk, pilot) → business model → skills/soft-target → state-machine/boss → equipment/loot → currency-sinks/gacha → dungeon structure → camera (biggest, last, matches the gap analysis's own "don't rush it" note — every other track can be built against the CURRENT camera without waiting on this one).
   - **Track 1 (docs debt), fixed in this repo directly**: `README.md`'s two stale claims — "ยังไม่มีระบบดรอปจริง" was false (RewardSystem/`earnGold('drop',...)` live since PR #14), "ฉากเดิน/สำรวจ" was listed as current scope when it's LEGACY since PR #11. LEGACY classification itself (item 80) was already correct on inspection.
