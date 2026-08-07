@@ -46,6 +46,12 @@ npm run ci        # typecheck + lint + test + build — รันให้ผ่
 
 โปรเจกต์นี้มีกฎบังคับสำหรับ AI agent ที่ทำงานในนี้ (memory protocol, coding standard,
 ring-authority policy) — อ่าน [`AGENTS.md`](AGENTS.md) และ [`MEMORY.md`](MEMORY.md) ก่อนเริ่ม
+
+**ส่งงานเข้าระบบหลัก (upstream):** อ่าน
+[`.agents/rules/upstream-submission-workflow.md`](.agents/rules/upstream-submission-workflow.md)
+— กำหนด repo หลัก vs fork, แยก docs/code PR, pre-push sync, และวิธี cherry-pick docs ไป
+`KatomnoiStudio/LegendOfSoulTH` โดยไม่ force
+
 ถ้า agent ของคุณไม่รองรับการอ่านไฟล์เหล่านี้อัตโนมัติ ให้สั่งตรง ๆ ให้อ่านก่อนแก้โค้ดใด ๆ
 
 ## Code of Conduct

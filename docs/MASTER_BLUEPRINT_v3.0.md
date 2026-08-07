@@ -872,7 +872,7 @@ Before wide systems:
 1. **One topic = one PR**
 2. Docs PR = classify only
 3. Update `MEMORY.md` when direction/contracts change
-4. Sync fork/upstream before implementation PRs
+4. Sync fork/upstream before implementation PRs — see `.agents/rules/upstream-submission-workflow.md`
 5. After docs PR: **stop for review**
 
 ---

@@ -2,7 +2,7 @@
 
 > **Operator / Human User**: `HetCreep`  
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`  
-> **RULES_VERSION: 17** (bump on every material rule change — see `.agents/rules/rules-freshness-check.md`)
+> **RULES_VERSION: 18** (bump on every material rule change — see `.agents/rules/rules-freshness-check.md`)
 
 ---
 
@@ -29,3 +29,4 @@
 13. **Lint policy** (`.agents/rules/lint-policy.md`): `npm run lint` is `oxlint --deny-warnings` and any finding fails CI and the pre-commit hook. Turning a rule off is a decision that belongs in that file with its reasoning, never a silent config diff.
 14. **Currency ledger retention** (`.agents/rules/currency-ledger-retention.md`): the transaction ledger is deliberately un-capped today because nothing grows it yet. When `earnGold`/`grantItem` get wired to real gameplay, archive — never delete — and never prune `coupon`/`topup` entries; a naive cap reopens coupon replay.
 15. **Master Blueprint authority** (`.agents/rules/master-blueprint-law.md`): `docs/MASTER_BLUEPRINT_v3.0.md` is the Product North Star (v1/v2 superseded). Locked decisions bind agents. CUT/DEFERRED items (loot RPG, affix, dash button, skill-4, etc.) must not ship without HetCreep approval. Docs PRs classify only; implementation PRs name section + P1–P15 priority; one topic = one PR; stop for review after docs PR.
+16. **Upstream submission workflow** (`.agents/rules/upstream-submission-workflow.md`): canonical repo is `KatomnoiStudio/LegendOfSoulTH`; fork `nustanakritwithai/GameTurnBase` is design Q&A only (comment + close issues). Docs PRs and code PRs are separate; sync docs to upstream via cherry-pick without force; every submit includes `MEMORY.md`; follow pre-push sync before every push.
