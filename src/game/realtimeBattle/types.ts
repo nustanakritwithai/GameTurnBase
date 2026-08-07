@@ -7,6 +7,8 @@
  * ───────────────────────────────────────────────────────────
  */
 
+import type { SkillSlot } from './skills'
+
 export type BattleStatus = 'loading' | 'intro' | 'running' | 'victory' | 'defeat' | 'exiting'
 
 export interface Vec2 {
@@ -102,6 +104,9 @@ export interface RealtimeBattleSnapshot {
 
   currentWave: number
   totalWaves: number
+
+  /** ช่องสกิลที่กำลังร่าย — null เมื่อไม่ได้ร่าย (สำหรับ UI state) */
+  castingSkillSlot: SkillSlot | null
 
   damageEvents: DamageEvent[]
   effectEvents: BattleEffectEvent[]

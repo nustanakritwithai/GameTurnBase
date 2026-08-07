@@ -509,6 +509,16 @@ export class RealtimeBattleRuntime {
     return this.state
   }
 
+  /** สถานะคอมโบผู้เล่น — UI อ่านเพื่อแสดง attack/casting (ห้ามแก้ค่า) */
+  getPlayerComboState(): Readonly<ComboState> {
+    return this.playerCombat
+  }
+
+  /** ช่องสกิลที่กำลังร่าย — null เมื่อไม่ได้ร่าย */
+  getCastingSkillSlot(): SkillSlot | null {
+    return this.playerSkill.definition?.slot ?? null
+  }
+
   getSnapshot = (): RealtimeBattleSnapshot => this.snapshot
 
   subscribe = (listener: Listener): (() => void) => {
@@ -545,6 +555,7 @@ export class RealtimeBattleRuntime {
       })),
       currentWave: state.currentWaveIndex + 1,
       totalWaves: state.stage.waves.length,
+      castingSkillSlot: this.playerSkill.definition?.slot ?? null,
       damageEvents: this.damageEvents,
       effectEvents: this.effectEvents,
     }

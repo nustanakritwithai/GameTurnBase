@@ -50,11 +50,27 @@ describe('InputSystem', () => {
 
     key('keydown', 'KeyD')
     input.setJoystick({ x: 0, y: -0.6 })
-    expect(input.getMoveVector()).toEqual({ x: 0, y: -0.6 })
+    const joy = input.getMoveVector()
+    expect(joy.x).toBe(0)
+    expect(joy.y).toBeLessThan(0)
 
-    // ปล่อยจอยแล้วคีย์บอร์ดที่ยังกดค้างอยู่ต้องกลับมาทำงานทันที
     input.setJoystick({ x: 0, y: 0 })
     expect(input.getMoveVector()).toEqual({ x: 1, y: 0 })
+  })
+
+  it('dead zone กลางจอยคืนศูนย์', () => {
+    const input = new InputSystem()
+    input.setJoystick({ x: 0.05, y: 0.05 })
+    expect(input.getMoveVector()).toEqual({ x: 0, y: 0 })
+  })
+
+  it('MovementInput abstraction แมป depth เป็น Vec2.y', () => {
+    const input = new InputSystem()
+    input.setMovementInput({ x: 0.8, depth: -0.4 })
+    const movement = input.getMovementInput()
+    expect(movement.x).toBeGreaterThan(0)
+    expect(movement.depth).toBeLessThan(0)
+    expect(input.getMoveVector().y).toBeLessThan(0)
   })
 
   it('สลับแท็บทั้งที่กดค้าง (blur) ต้องไม่ทำให้ตัวละครเดินค้าง', () => {

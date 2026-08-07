@@ -13,11 +13,8 @@ import { InputSystem } from '../game/realtimeBattle/InputSystem'
 import { startBattleLoop, type BattleLoopHandle } from '../game/realtimeBattle/RealtimeBattleLoop'
 import { RealtimeBattleRuntime } from '../game/realtimeBattle/RealtimeBattleRuntime'
 import { getEnemyTemplate, getRealtimeStage } from '../game/realtimeBattle/stageConfig'
-import type {
-  RealtimeBattleResult,
-  RealtimeBattleSnapshot,
-  Vec2,
-} from '../game/realtimeBattle/types'
+import type { MovementInput } from '../game/realtimeBattle/playerInput'
+import type { RealtimeBattleResult, RealtimeBattleSnapshot } from '../game/realtimeBattle/types'
 import type { SkillSlot } from '../game/realtimeBattle/skills'
 import type { Player } from '../types/player'
 
@@ -46,8 +43,8 @@ interface UseRealtimeBattleValue {
   snapshot: RealtimeBattleSnapshot | null
   /** ขอออกจากห้อง — หยุดจำลองก่อน แล้วผู้เรียกค่อยพาผู้เล่นกลับ */
   requestExit: () => void
-  /** จอยสติกบนจอสัมผัสส่งเวกเตอร์เดินเข้ามาทางนี้ (คีย์บอร์ดต่อตรงกับ InputSystem อยู่แล้ว) */
-  setJoystick: (vector: Vec2) => void
+  /** จอยสติกบนจอสัมผัสส่ง MovementInput (คีย์บอร์ดต่อตรงกับ InputSystem อยู่แล้ว) */
+  setJoystick: (input: MovementInput) => void
   /** ปุ่มโจมตีบนจอสัมผัส */
   pressAttack: () => void
   /** ปุ่มสกิลบนจอสัมผัส (ช่อง 1–3 หรือ ultimate) */
@@ -202,8 +199,8 @@ export function useRealtimeBattle({
     runtime?.requestExit()
   }, [runtime])
 
-  const setJoystick = useCallback((vector: Vec2) => {
-    inputRef.current?.setJoystick(vector)
+  const setJoystick = useCallback((input: MovementInput) => {
+    inputRef.current?.setMovementInput(input)
   }, [])
 
   const pressAttack = useCallback(() => {

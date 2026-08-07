@@ -2,7 +2,7 @@
 export const GAME_INFO = {
   name: 'Legend of Soul-TH',
   nameEn: 'Mythic Real-Time RPG',
-  version: '0.7.0',
+  version: '0.7.1',
   stage: 'อยู่ระหว่างพัฒนา',
   genre: 'ต่อสู้เรียลไทม์ (Real-time Action)',
 } as const

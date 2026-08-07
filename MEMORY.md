@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-07T22:30:00+07:00 by `Cursor Agent (cloud)` (Ring 0 docs cleanup — #53/#54 supersede numerics, #47 CONFIRMED, merge #56)
+> **Last Updated**: 2026-08-07T20:45:00+07:00 by `Cursor Agent (cloud)` (mobile combat UI redesign — v0.7.1)
 > **RULES_VERSION last synced: 17** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
@@ -36,10 +36,10 @@
 - **Deploy webhook หลุด 1 ครั้ง (2026-08-07)**: push bump `cf8b5de` (0.3.0) เอง workflow `deploy.yml` ไม่ถูกจ้างเลย (0 run สำหรับ commit นั้น) — ช่วงที่ GitHub ยังฟื้นจาก outage (สถานะตอนนั้น "Partial System Outage") แก้ด้วย manual `workflow_dispatch` (`force:true`) ผ่าน REST API แทน — deploy/release ผ่านปกติ. commit ถัดไปด้วยกลไกปกติ (0.3.1) trigger เองสำเร็จไม่ต้องแทรกแซง — ถ้าเว็บไม่อัพเดตหลัง push ที่ bump เวอร์ชันแล้ว เช็ค `actions/runs?head_sha=<sha>` ก่อนสงสัยโค้ด (อาจเป็นแค่ webhook หลุด ไม่ใช่บั๊ก).
 - **Session expiry (2026-08-07, แก้แล้ว, v0.3.1)**: `accountRepository.ts`'s session เดิมไม่มี TTL เลย (`{uid,email}` เท่านั้น) ล็อกอินครั้งเดียวค้างตลอดไป — เพิ่ม `expiresAt` แบบ sliding window 30 วัน (`readActiveSession()` เป็นจุดอ่านเดียวที่ทุกฟังก์ชันต้องผ่าน, ต่ออายุทุกครั้งที่อ่านสำเร็จ, session รูปแบบเก่าไม่มี `expiresAt` = หมดอายุทันที).
 - **History rewrite (อีเมลแอดมินเก่าใน git log)**: ตัดสินใจแล้ว **ไม่ทำ** (HetCreep เลือก "ไม่แตะ (แนะนำ)" 2026-08-07 หลังเจอ fork จริงที่ยัง active — `nustanakritwithai/GameTurnBase`) — ห้ามหยิบขึ้นมาทำอีกโดยไม่มีคำสั่งใหม่.
-- **Version**: **0.7.0** (P3 PR — bump จาก 0.6.0 หลัง P0–P2 merge upstream)
-- **Org rename → `KatomnoiStudio` (2026-08-07)**: GitHub org `LegendofSoulTH` renamed by HetCreep via web UI (rename isn't exposed via REST API — verified live, `PATCH /orgs/{org}` silently no-ops on `login`). Live Pages URL is NOT covered by GitHub's redirect (old `legendofsoulth.github.io` confirmed 404 live) — new live URL: https://katomnoistudio.github.io/LegendOfSoulTH/
-- **Real backend: Supabase LIVE (2026-08-07)**: `useAuth.ts` wired to Supabase Auth + Postgres RPCs (`earn_gold`/`grant_item`/`redeem_coupon`/`grant_character`, all `SECURITY DEFINER` so ledger rules are DB-enforced) — localStorage accounts discarded (accepted trade-off, few/no real players on a brand-new project). `accountRepository.ts` stays in the tree as an untouched fallback seam only. CI injects `VITE_SUPABASE_*` at build (org-level secret, item 87); `main.tsx` dynamic-imports `App` so a missing/rotated secret degrades to a fallback screen instead of a blank page (item 88).
-- **Master Blueprint v3.0**: **#46–#54 gap register CLOSED** · **#47 CONFIRMED** (`effects[]` optional architecture) · **#53/#54 architecture-only** (numerics → P8/P9; superseded agent-inferred maxLevel=10 / 1dup=+1★) · docs PR **#56** canonical · **NEXT:** P4 implement (code PR แยก)
+- **Version**: **0.7.1** (mobile combat control UI redesign — Naruto-mobile-inspired layout, pre-P4)
+- **Org rename → `KatomnoiStudio` (2026-08-07)**: live URL https://katomnoistudio.github.io/LegendOfSoulTH/
+- **Real backend: Supabase LIVE (2026-08-07)**: `useAuth.ts` → Supabase Auth + RPCs; `accountRepository.ts` = dormant fallback seam only
+- **Master Blueprint v3.0**: **#46–#54 gap register CLOSED** · **#53/#54 architecture-only** · docs PR **#56** canonical · **NEXT:** P4 Enemy AI (code PR) — mobile combat UI done first (HetCreep 2026-08-07)
 - **Battle (CURRENT)**: realtime · 2.5D side-down · L/R + lunge · 3 skills + ultimate (P3) · no global soft-target (#33 Attack Snap superseded); **Ult skill-only lock** (หนุมาน §3.7)
 - **P8/P13 baselines**: #35 ★6≤130%★1 · #40 cap 60 · #39 Elo/7-tier/K32 · #44 client-predict+reconcile @ P12 · **#53** skill level architecture only (numerics P8) · **#54** star ascension architecture only (numerics P9) · **#38** gacha numerics P9
 

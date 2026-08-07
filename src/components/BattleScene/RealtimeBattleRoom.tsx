@@ -3,7 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import WebGL from 'three/addons/capabilities/WebGL.js'
 import { reportError } from '../../lib/errors/reportError'
 import type { RealtimeBattleRuntime } from '../../game/realtimeBattle/RealtimeBattleRuntime'
-import type { RealtimeBattleSnapshot, Vec2 } from '../../game/realtimeBattle/types'
+import type { MovementInput } from '../../game/realtimeBattle/playerInput'
+import type { RealtimeBattleSnapshot } from '../../game/realtimeBattle/types'
 import type { SkillSlot } from '../../game/realtimeBattle/skills'
 import { BattleArena } from './BattleArena'
 import { BattleControls } from './BattleControls'
@@ -30,7 +31,7 @@ export function RealtimeBattleRoom({
   runtime: RealtimeBattleRuntime
   snapshot: RealtimeBattleSnapshot
   onExit: () => void
-  onMove: (vector: Vec2) => void
+  onMove: (input: MovementInput) => void
   onAttack: () => void
   onSkill: (slot: SkillSlot) => void
 }) {

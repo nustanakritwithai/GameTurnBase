@@ -1,15 +1,15 @@
 import type { RealtimeBattleRuntime } from '../../game/realtimeBattle/RealtimeBattleRuntime'
 import type { SkillSlot } from '../../game/realtimeBattle/skills'
-import type { Vec2 } from '../../game/realtimeBattle/types'
-import { AttackButton } from './AttackButton'
+import type { MovementInput } from '../../game/realtimeBattle/playerInput'
+import { layoutCssVars } from '../../game/realtimeBattle/combatUILayout'
 import { BattleJoystick } from './BattleJoystick'
-import { SkillBar } from './SkillBar'
+import { CombatCluster } from './CombatCluster'
 import styles from './BattleScene.module.css'
 
 /**
- * ชั้นปุ่มควบคุมบนจอ — จอยซ้าย ปุ่มขวา (Blueprint v3 P3)
+ * Mobile combat control HUD — left movement, right combat cluster.
  *
- * ขวา: Basic Attack + สกิล 1/2/3 + Ultimate — ไม่มีปุ่ม dash
+ * Blueprint v3 §3.3 + Naruto-mobile-inspired ergonomics (UX reference only).
  */
 export function BattleControls({
   runtime,
@@ -18,18 +18,17 @@ export function BattleControls({
   onSkill,
 }: {
   runtime: RealtimeBattleRuntime
-  onMove: (vector: Vec2) => void
+  onMove: (input: MovementInput) => void
   onAttack: () => void
   onSkill: (slot: SkillSlot) => void
 }) {
   return (
-    <div className={styles.controls}>
+    <div className={styles.controls} style={layoutCssVars()}>
       <div className={styles.controlsLeft}>
         <BattleJoystick onChange={onMove} />
       </div>
       <div className={styles.controlsRight}>
-        <SkillBar runtime={runtime} onPress={onSkill} />
-        <AttackButton onPress={onAttack} />
+        <CombatCluster runtime={runtime} onAttack={onAttack} onSkill={onSkill} />
       </div>
     </div>
   )

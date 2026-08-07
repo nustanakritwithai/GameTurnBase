@@ -7,6 +7,31 @@
 
 ยังไม่มี
 
+## [0.7.1] - 2026-08-07
+
+Mobile combat control UI redesign (Naruto-mobile-inspired ergonomics) — Blueprint v3 §3.3
+
+### Added
+
+- **`combatUILayout.ts`** — centralized responsive layout config (joystick/attack/skill scales, safe-area CSS vars)
+- **`playerInput.ts`** — `MovementInput` / `PlayerInputState` abstraction (x + depth, not screen coords)
+- **`joystickMath.ts`** — dead zone + stick normalization (tested)
+- **`combatButtonState.ts`** — READY/COOLDOWN/CASTING/DISABLED/LOCKED derivation from runtime
+- **`CombatActionButton`** + **`CombatCluster`** — attack-primary cluster (ATK largest, S1/S2/S3/ULT arc)
+- Radial cooldown mask + numeric countdown on skill buttons; ultimate gauge fill + ready pulse
+- Battle HUD enemy vitals panel (top-right); player portrait slot (top-left)
+- `castingSkillSlot` on battle snapshot for authoritative UI state
+
+### Changed
+
+- Joystick: responsive anchor (~15%/79%), enlarged touch area, dead zone 0.12, multi-touch isolated
+- `InputSystem.setMovementInput()` — keyboard + joystick share one path; dead zone on stick only
+- Removed legacy `AttackButton.tsx` / `SkillBar.tsx` (replaced by cluster)
+
+### Removed
+
+- Unused dash button CSS (Blueprint v3 CUT — no dash button)
+
 ## [0.7.0] - 2026-08-07
 
 Blueprint v3 P3 — 3 Skills + Ultimate framework, ตัด dash button + Combat Foundation Design Lock §3.6

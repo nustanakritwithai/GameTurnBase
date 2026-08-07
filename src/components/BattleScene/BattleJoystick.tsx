@@ -1,24 +1,32 @@
-import { useCallback, useRef, useState } from 'react'
-import type { Vec2 } from '../../game/realtimeBattle/types'
+import { useCallback, useRef, useState, type CSSProperties } from 'react'
+import { DEFAULT_COMBAT_UI_LAYOUT } from '../../game/realtimeBattle/combatUILayout'
+import { clampStickVector } from '../../game/realtimeBattle/joystickMath'
+import { vec2ToMovementInput, type MovementInput } from '../../game/realtimeBattle/playerInput'
 import styles from './BattleScene.module.css'
 
-/**
- * จอยสติกเสมือนสำหรับจอสัมผัส (§12)
- *
- * ออกแบบให้เล่นด้วยสองนิ้วพร้อมกันได้: ตัวจอยจับเฉพาะ pointerId ของนิ้วที่แตะมันเป็นคนแรก
- * แล้ว setPointerCapture ไว้ นิ้วที่สองที่ไปกดปุ่มโจมตีจึงไม่ไปแย่งการควบคุมจอย
- * (ถ้าใช้ event ระดับ window ร่วมกันจะเกิดอาการ "เดินอยู่แล้วกดโจมตีทีนึงตัวหยุดเดิน")
- *
- * ค่าที่ส่งออกเป็นเวกเตอร์ -1..1 ตามระยะที่ลากจากจุดกึ่งกลาง — ผลักไปไกลกว่ารัศมีก็ตัดที่ 1
- */
-
-/** รัศมีของแป้นจอยเป็นพิกเซล — ใช้แปลงระยะลากเป็นค่า -1..1 */
 const STICK_RADIUS = 52
 
-export function BattleJoystick({ onChange }: { onChange: (vector: Vec2) => void }) {
+export interface BattleJoystickProps {
+  onChange: (input: MovementInput) => void
+}
+
+/**
+ * Virtual joystick — bottom-left, multi-touch isolated, dead-zone normalized.
+ *
+ * Outputs MovementInput (x + depth) — combat never reads screen coordinates.
+ */
+export function BattleJoystick({ onChange }: BattleJoystickProps) {
   const baseRef = useRef<HTMLDivElement>(null)
   const activePointer = useRef<number | null>(null)
-  const [knob, setKnob] = useState<Vec2>({ x: 0, y: 0 })
+  const [knob, setKnob] = useState({ x: 0, y: 0 })
+
+  const emit = useCallback(
+    (raw: { x: number; y: number }) => {
+      setKnob(raw)
+      onChange(vec2ToMovementInput({ x: raw.x, y: raw.y }))
+    },
+    [onChange],
+  )
 
   const update = useCallback(
     (clientX: number, clientY: number) => {
@@ -28,64 +36,54 @@ export function BattleJoystick({ onChange }: { onChange: (vector: Vec2) => void 
       const rect = base.getBoundingClientRect()
       const dx = clientX - (rect.left + rect.width / 2)
       const dy = clientY - (rect.top + rect.height / 2)
-
-      /*
-        แปลงเป็นพิกัดของเวทีก่อน แล้วค่อยหารด้วยรัศมี
-
-        ฐานจอยถูกกำหนดขนาดด้วย CSS ที่ยืดตามจอ ระยะที่ได้จาก getBoundingClientRect
-        จึงเป็น "พิกเซลบนจอจริง" ไม่ใช่หน่วยของ STICK_RADIUS ถ้าไม่หารกลับ จอยจะรู้สึก
-        หนืดผิดปกติเมื่อเปิดบนจอเล็ก
-        (เดิมคอมเมนต์ตรงนี้อ้าง transform: scale() ของ GameViewport ซึ่งถูกถอดไปแล้ว —
-        ดู GameViewport.tsx สูตรยังถูกอยู่ เพราะวัดจากขนาดจริงของฐานจอยเอง)
-      */
       const scale = rect.width / (STICK_RADIUS * 2)
-      const x = dx / scale / STICK_RADIUS
-      const y = dy / scale / STICK_RADIUS
-
-      const length = Math.hypot(x, y)
-      const clamped = length > 1 ? { x: x / length, y: y / length } : { x, y }
-
-      setKnob(clamped)
-      onChange(clamped)
+      const raw = clampStickVector(dx / scale, dy / scale, STICK_RADIUS)
+      emit(raw)
     },
-    [onChange],
+    [emit],
   )
 
   const release = useCallback(() => {
     activePointer.current = null
-    setKnob({ x: 0, y: 0 })
-    onChange({ x: 0, y: 0 })
-  }, [onChange])
+    emit({ x: 0, y: 0 })
+  }, [emit])
 
   return (
     <div
-      ref={baseRef}
-      className={styles.joystickBase}
-      role="application"
-      aria-label="แป้นบังคับทิศทาง"
-      onPointerDown={(event) => {
-        if (activePointer.current !== null) return
-        activePointer.current = event.pointerId
-        event.currentTarget.setPointerCapture(event.pointerId)
-        update(event.clientX, event.clientY)
-      }}
-      onPointerMove={(event) => {
-        if (activePointer.current !== event.pointerId) return
-        update(event.clientX, event.clientY)
-      }}
-      onPointerUp={(event) => {
-        if (activePointer.current !== event.pointerId) return
-        release()
-      }}
-      onPointerCancel={(event) => {
-        if (activePointer.current !== event.pointerId) return
-        release()
-      }}
+      className={styles.joystickZone}
+      style={{ '--combat-dead-zone': String(DEFAULT_COMBAT_UI_LAYOUT.deadZone) } as CSSProperties}
     >
       <div
-        className={styles.joystickKnob}
-        style={{ transform: `translate(${knob.x * STICK_RADIUS}px, ${knob.y * STICK_RADIUS}px)` }}
-      />
+        ref={baseRef}
+        className={styles.joystickBase}
+        role="application"
+        aria-label="แป้นบังคับทิศทาง"
+        onPointerDown={(event) => {
+          if (activePointer.current !== null) return
+          activePointer.current = event.pointerId
+          event.currentTarget.setPointerCapture(event.pointerId)
+          update(event.clientX, event.clientY)
+        }}
+        onPointerMove={(event) => {
+          if (activePointer.current !== event.pointerId) return
+          update(event.clientX, event.clientY)
+        }}
+        onPointerUp={(event) => {
+          if (activePointer.current !== event.pointerId) return
+          release()
+        }}
+        onPointerCancel={(event) => {
+          if (activePointer.current !== event.pointerId) return
+          release()
+        }}
+      >
+        <div
+          className={styles.joystickKnob}
+          style={{
+            transform: `translate(${knob.x * STICK_RADIUS}px, ${knob.y * STICK_RADIUS}px)`,
+          }}
+        />
+      </div>
     </div>
   )
 }

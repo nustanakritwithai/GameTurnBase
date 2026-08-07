@@ -1,10 +1,14 @@
-import type { Vec2 } from './types'
 import type { SkillSlot } from './skills'
+import { DEFAULT_COMBAT_UI_LAYOUT } from './combatUILayout'
+import { applyJoystickDeadZone } from './joystickMath'
+import { vec2ToMovementInput, type MovementInput } from './playerInput'
+import type { Vec2 } from './types'
 
 /**
- * รวบรวมอินพุตทุกทางให้เหลือ "เวกเตอร์เดินหนึ่งตัว" ที่ runtime อ่าน
+ * รวบรวมอินพุตทุกทางให้เหลือเวกเตอร์เดินหนึ่งตัวที่ runtime อ่าน
  *
- * Blueprint v3 P3: 3 skills + ultimate (ไม่มีปุ่ม dash)
+ * Touch joystick + keyboard → MovementInput → Vec2 (battle x + depth)
+ * Combat buttons → buffered press queue (runtime consumes each frame)
  */
 
 const KEY_VECTORS: Record<string, Vec2> = {
@@ -37,6 +41,7 @@ export class InputSystem {
   private joystick: Vec2 = { x: 0, y: 0 }
   private pendingAttacks = 0
   private pendingSkillSlots: SkillSlot[] = []
+  private deadZone = DEFAULT_COMBAT_UI_LAYOUT.deadZone
 
   attachKeyboard(target: Window = window): () => void {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -74,8 +79,17 @@ export class InputSystem {
     }
   }
 
+  /** Raw stick vector from UI (-1..1 per axis, before dead zone). */
   setJoystick(vector: Vec2): void {
-    this.joystick = vector
+    this.joystick = applyJoystickDeadZone(vector.x, vector.y, this.deadZone)
+  }
+
+  setMovementInput(input: MovementInput): void {
+    this.setJoystick({ x: input.x, y: input.depth })
+  }
+
+  getMovementInput(): MovementInput {
+    return vec2ToMovementInput(this.getMoveVector())
   }
 
   getMoveVector(): Vec2 {

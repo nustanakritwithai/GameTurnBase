@@ -62,14 +62,72 @@
 
 .playerVitals {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: var(--sp-2);
-  min-width: min(46%, 320px);
+  min-width: min(40%, 300px);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md);
   background: var(--c-panel);
   border: 1px solid var(--c-border);
+}
+
+.playerPortrait,
+.enemyPortrait {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+  background: rgb(20 16 32 / 85%);
+  color: var(--c-gold);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.playerVitalsBody,
+.enemyVitalsBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.enemyVitals {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: min(40%, 300px);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--c-panel);
+  border: 1px solid var(--c-border);
+  justify-items: end;
+}
+
+.enemyName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffb073;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.enemyHpTrack {
+  position: relative;
+  height: 10px;
+  width: 100%;
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / 12%);
+  overflow: hidden;
+}
+
+.enemyHpFill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, #ff6a5c, #ffb073);
+  transition: width 120ms linear;
 }
 
 .playerName {
@@ -188,38 +246,50 @@
   }
 }
 
-/* ── ปุ่มควบคุมบนจอ ─────────────────────────────────────── */
+/* ── Mobile combat controls (Naruto-mobile-inspired layout) ── */
 
 .controls {
   position: absolute;
   inset: 0;
   z-index: 4;
-  /* ให้เห็นฉากได้เต็ม ๆ — เฉพาะตัวควบคุมเท่านั้นที่รับการแตะ */
   pointer-events: none;
-  padding: max(var(--sp-4), env(safe-area-inset-top)) max(var(--sp-4), env(safe-area-inset-right))
-    max(var(--sp-4), env(safe-area-inset-bottom)) max(var(--sp-4), env(safe-area-inset-left));
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  padding: max(var(--sp-3), env(safe-area-inset-top)) max(var(--sp-3), env(safe-area-inset-right))
+    max(var(--sp-4), env(safe-area-inset-bottom)) max(var(--sp-3), env(safe-area-inset-left));
 }
 
 .controlsLeft {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--sp-4);
+  position: absolute;
+  left: var(--combat-joystick-x, 15%);
+  top: var(--combat-joystick-y, 79%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.controlsRight {
+  position: absolute;
+  right: max(var(--combat-inset-right, 0px), env(safe-area-inset-right));
+  bottom: max(var(--combat-inset-bottom, 0px), env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.joystickZone {
+  position: relative;
+  width: calc(var(--combat-joystick-size, 128px) * var(--combat-joystick-touch-scale, 1.35));
+  height: calc(var(--combat-joystick-size, 128px) * var(--combat-joystick-touch-scale, 1.35));
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
 }
 
 .joystickBase {
-  pointer-events: auto;
   position: relative;
-  width: 128px;
-  height: 128px;
+  width: var(--combat-joystick-size, 128px);
+  height: var(--combat-joystick-size, 128px);
   border-radius: 50%;
-  border: 2px solid var(--c-border);
-  background: radial-gradient(circle, rgb(24 18 42 / 55%), rgb(10 8 20 / 78%));
+  border: 2px solid rgb(240 200 90 / 35%);
+  background: radial-gradient(circle, rgb(24 18 42 / 50%), rgb(10 8 20 / 72%));
   box-shadow: var(--shadow-2);
   touch-action: none;
-  /* กันเบราว์เซอร์เด้งเมนูค้างเมื่อกดแช่บนมือถือ */
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -229,9 +299,10 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 56px;
-  height: 56px;
-  margin: -28px 0 0 -28px;
+  width: calc(var(--combat-joystick-size, 128px) * 0.44);
+  height: calc(var(--combat-joystick-size, 128px) * 0.44);
+  margin: calc(var(--combat-joystick-size, 128px) * -0.22) 0 0
+    calc(var(--combat-joystick-size, 128px) * -0.22);
   border-radius: 50%;
   border: 1px solid var(--c-gold);
   background: linear-gradient(180deg, rgb(240 200 90 / 55%), rgb(120 92 24 / 75%));
@@ -239,53 +310,23 @@
   pointer-events: none;
 }
 
-/*
-  จอเตี้ยแบบมือถือแนวนอน — ปุ่มต้อง "ใหญ่ขึ้น" ไม่ใช่เล็กลง
-
-  เคยตั้งค่าชุดนี้ให้เล็กลงเพื่อประหยัดพื้นที่ แล้ววัดจริงในเบราว์เซอร์ได้ปุ่มโจมตี 42px
-  และปุ่มหลบ 28px — ต่ำกว่าเกณฑ์เป้าแตะ 44px ของสเปกข้อ 12/29 ทั้งคู่ ค่าปัจจุบันตั้งจาก
-  การวัดสดในเบราว์เซอร์ที่ 844x390 ไม่ใช่จากการคำนวณ ถ้าจะแก้ตัวเลขพวกนี้ให้วัดใหม่ด้วย
-  getBoundingClientRect บนจอมือถือแนวนอนที่เล็กที่สุดที่รองรับ อย่าคำนวณเอาเอง
-
-  หมายเหตุ: คอมเมนต์เดิมตรงนี้อธิบายว่าต้องเผื่อขนาดเพราะ GameViewport ย่อทั้งเวทีด้วย
-  transform: scale() ตัวคูณ ~0.43 — เหตุผลนั้นใช้ไม่ได้แล้ว GameViewport ไม่ย่ออะไรอีก
-  (ดู GameViewport.module.css: .stage เป็น inset: 0 เต็มกรอบ ไม่มี scale) ค่าที่เห็นในโค้ด
-  จึงเป็นพิกเซลจริงบนจอตรง ๆ ไม่ต้องคูณกลับ
-*/
-@media (max-height: 480px) {
-  .joystickBase {
-    width: 132px;
-    height: 132px;
-  }
-  .joystickKnob {
-    width: 58px;
-    height: 58px;
-    margin: -29px 0 0 -29px;
-  }
+/* Combat cluster — attack bottom-right, skills arc above/left */
+.combatCluster {
+  position: relative;
+  width: calc(var(--combat-attack-size, 84px) * 2.8);
+  height: calc(var(--combat-attack-size, 84px) * 2.6);
+  pointer-events: none;
 }
 
-.controlsRight {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--sp-2);
-}
-
-.skillBar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--sp-2);
-}
-
-.attackBtn {
+.combatBtn {
   pointer-events: auto;
-  /* ปุ่มโจมตีต้องใหญ่ที่สุดบนจอ (§12) */
-  width: 116px;
-  height: 116px;
+  position: absolute;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  border: 2px solid var(--c-ember);
-  background: radial-gradient(circle at 50% 35%, rgb(255 140 90 / 55%), rgb(120 34 20 / 88%));
+  border: 2px solid var(--c-border);
+  background: radial-gradient(circle at 50% 35%, rgb(40 32 58 / 75%), rgb(12 10 22 / 92%));
   color: var(--c-gold-light);
-  font-size: 1.05rem;
   font-weight: 800;
   cursor: pointer;
   touch-action: none;
@@ -293,18 +334,151 @@
   user-select: none;
   -webkit-touch-callout: none;
   box-shadow: var(--shadow-2);
-  transition: transform 90ms var(--ease-out);
+  transition:
+    transform 70ms var(--ease-out),
+    box-shadow 120ms var(--ease-out),
+    border-color 120ms var(--ease-out);
+  overflow: hidden;
+  min-width: 44px;
+  min-height: 44px;
 }
 
-.attackBtn:active {
-  transform: scale(0.94);
+.combatBtnPressed {
+  transform: scale(0.92);
+}
+
+.combatBtnAttack {
+  width: max(44px, var(--combat-attack-size, 84px));
+  height: max(44px, var(--combat-attack-size, 84px));
+  border-color: var(--c-ember);
+  background: radial-gradient(circle at 50% 35%, rgb(255 140 90 / 55%), rgb(120 34 20 / 88%));
+  font-size: clamp(0.85rem, 2.2vw, 1rem);
+}
+
+.combatBtnSkill {
+  width: max(44px, var(--combat-skill-size, 60px));
+  height: max(44px, var(--combat-skill-size, 60px));
+  border-color: var(--c-gold);
+  font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+}
+
+.combatBtnUltimate {
+  width: max(44px, var(--combat-ultimate-size, 64px));
+  height: max(44px, var(--combat-ultimate-size, 64px));
+  border-color: #e8a84a;
+  background: radial-gradient(circle at 50% 35%, rgb(255 180 80 / 55%), rgb(100 40 8 / 90%));
+  font-size: clamp(0.72rem, 1.9vw, 0.88rem);
+}
+
+.combatSlotAttack {
+  right: 0;
+  bottom: 0;
+}
+
+.combatSlotS1 {
+  right: calc(var(--combat-attack-size, 84px) + var(--combat-skill-gap, 10px));
+  bottom: 0;
+}
+
+.combatSlotS2 {
+  right: calc(var(--combat-attack-size, 84px) + var(--combat-skill-gap, 10px));
+  bottom: calc(var(--combat-skill-size, 60px) + var(--combat-skill-gap, 10px));
+}
+
+.combatSlotS3 {
+  right: calc(
+    var(--combat-attack-size, 84px) + var(--combat-skill-size, 60px) +
+      var(--combat-skill-gap, 10px) * 2
+  );
+  bottom: calc(var(--combat-skill-size, 60px) + var(--combat-skill-gap, 10px));
+}
+
+.combatSlotUltimate {
+  right: calc(var(--combat-attack-size, 84px) * 0.35);
+  bottom: calc(var(--combat-attack-size, 84px) + var(--combat-skill-gap, 10px));
+}
+
+.combatBtnReady {
+  border-color: var(--c-gold);
+}
+
+.combatBtnCooldown {
+  opacity: 0.92;
+}
+
+.combatBtnCasting {
+  border-color: var(--c-arcane-light);
+  box-shadow: 0 0 10px rgb(120 160 255 / 35%);
+}
+
+.combatBtnDisabled,
+.combatBtnLocked {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+
+.combatBtnPulse {
+  animation: combatReadyPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes combatReadyPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(240 200 90 / 0%);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgb(240 200 90 / 35%);
+  }
+}
+
+.combatBtnCooldownRadial {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    rgb(0 0 0 / 68%) var(--cooldown-deg, 0deg),
+    transparent var(--cooldown-deg, 0deg)
+  );
+  pointer-events: none;
+}
+
+.combatBtnCooldownText {
+  position: absolute;
+  z-index: 2;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 90%);
+}
+
+.combatBtnUltimateFill {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 100%;
+  transform-origin: bottom;
+  background: rgb(0 0 0 / 55%);
+  pointer-events: none;
+}
+
+.combatBtnLabel {
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-height: 480px) {
-  .attackBtn {
-    width: 148px;
-    height: 148px;
-    font-size: 1.15rem;
+  .combatCluster {
+    width: calc(var(--combat-attack-size, 84px) * 3);
+    height: calc(var(--combat-attack-size, 84px) * 2.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combatBtnPulse {
+    animation: none;
+  }
+  .combatBtn {
+    transition: none;
   }
 }
 
@@ -350,149 +524,6 @@
 .enemyBarFill {
   height: 100%;
   background: linear-gradient(90deg, #ff6a5c, #ffb073);
-}
-
-.dashBtn {
-  pointer-events: auto;
-  position: relative;
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  border: 2px solid var(--c-arcane);
-  background: rgb(20 26 52 / 82%);
-  color: var(--c-arcane-light);
-  font-size: 0.9rem;
-  font-weight: 800;
-  cursor: pointer;
-  overflow: hidden;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  box-shadow: var(--shadow-1);
-  transition: transform 90ms var(--ease-out);
-}
-
-.dashBtn:active {
-  transform: scale(0.94);
-}
-
-/* วงคูลดาวน์ไล่จากล่างขึ้นบน — เต็ม = เพิ่งกด, ว่าง = พร้อมใช้ */
-.dashCooldown {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 0;
-  background: rgb(0 0 0 / 62%);
-  pointer-events: none;
-}
-
-.dashLabel {
-  position: relative;
-  z-index: 1;
-}
-
-@media (max-height: 480px) {
-  .dashBtn {
-    width: 112px;
-    height: 112px;
-    font-size: 1rem;
-  }
-}
-
-.skillBtn {
-  pointer-events: auto;
-  position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  border: 2px solid var(--c-gold);
-  background: radial-gradient(circle at 50% 35%, rgb(255 210 120 / 45%), rgb(90 52 10 / 88%));
-  color: var(--c-gold-light);
-  font-size: 0.78rem;
-  font-weight: 800;
-  cursor: pointer;
-  overflow: hidden;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  box-shadow: var(--shadow-1);
-  transition: transform 90ms var(--ease-out);
-}
-
-.skillBtn:active {
-  transform: scale(0.94);
-}
-
-.skillCooldown {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 0;
-  background: rgb(0 0 0 / 62%);
-  pointer-events: none;
-}
-
-.skillLabel {
-  position: relative;
-  z-index: 1;
-}
-
-.ultimateBtn {
-  pointer-events: auto;
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 2px solid #e8a84a;
-  background: radial-gradient(circle at 50% 35%, rgb(255 180 80 / 55%), rgb(100 40 8 / 90%));
-  color: #fff5d6;
-  font-size: 0.85rem;
-  font-weight: 900;
-  cursor: pointer;
-  overflow: hidden;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  box-shadow: 0 0 12px rgb(255 160 60 / 45%);
-  transition: transform 90ms var(--ease-out);
-}
-
-.ultimateBtn:active {
-  transform: scale(0.94);
-}
-
-.ultimateCooldown {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 0;
-  background: rgb(0 0 0 / 68%);
-  pointer-events: none;
-}
-
-.ultimateLabel {
-  position: relative;
-  z-index: 1;
-}
-
-@media (max-height: 480px) {
-  /* ask-CB (2026-08-06): 96px * ~0.43 = 41.3px จริงบนจอ — ต่ำกว่าเกณฑ์ 44px ของสเปกข้อ 12/29
-     (ปุ่มโจมตีข้างบนผ่านเกณฑ์นี้แล้วตามคอมเมนต์บรรทัด 233) เพิ่มเป็น 108px ให้ scale
-     เป็น ~46.4px ผ่านเกณฑ์ */
-  .skillBtn {
-    width: 108px;
-    height: 108px;
-    font-size: 1.05rem;
-  }
-
-  .ultimateBtn {
-    width: 112px;
-    height: 112px;
-    font-size: 1.1rem;
-  }
 }
 
 /* ── แผงผลหลังจบ ───────────────────────────────────────── */
