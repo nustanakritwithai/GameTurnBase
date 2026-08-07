@@ -20,7 +20,11 @@ export type Direction8 =
 /** ทิศโจมตีพื้นฐาน — ซ้าย/ขวาเท่านั้น (Blueprint v3 P2) */
 export type CombatFacing = 'left' | 'right'
 
-export type EntityState = 'idle' | 'walk' | 'attack' | 'skill' | 'hit' | 'dead'
+export type EntityState =
+  'idle' | 'walk' | 'attack' | 'skill' | 'hit' | 'telegraph' | 'knockdown' | 'getUp' | 'dead'
+
+/** Enemy tier — shared AI core; elite/boss get richer telegraphs & knockdown rules (§3.6.8) */
+export type EnemyTier = 'normal' | 'elite' | 'boss'
 
 /** ช่องสกิล 1–3 (ultimate ใช้ gauge แยก — ดู ultimateGauge.ts) */
 export type SkillCooldownSlot = 'skill1' | 'skill2' | 'skill3'
@@ -59,6 +63,10 @@ export interface RealtimeBattleEntity {
   /** เวลา (elapsedMs ของ runtime) ที่ยังอยู่ยงคงกระพันจนถึง */
   invulnerableUntilMs: number
   hitStunRemainingMs: number
+  /** Knockdown timer — framework for elite/boss + heavy moves (§3.6.5) */
+  knockdownRemainingMs: number
+  /** Get-up animation timer after knockdown */
+  getUpRemainingMs: number
 
   /** id ตัวละครผู้เล่น (ดู src/game/characters.ts) — มีเฉพาะฝ่ายผู้เล่น */
   characterId?: string

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { PLAYER_ATTACK_CHAIN } from './attacks'
+import { BASELINE_HITSTUN_MS } from './combatBaselines'
 
 /** ไม้แรกของคอมโบ — ใช้เป็นท่าอ้างอิงในเทสต์ชุดนี้ */
 const PLAYER_ATTACK = PLAYER_ATTACK_CHAIN[0]
-import { applyDamage, calcDamage } from './DamageSystem'
+import { applyDamage, calcDamage, canReceiveKnockdown } from './DamageSystem'
 import type { RealtimeBattleEntity } from './types'
 
 /**
@@ -41,6 +42,8 @@ function entity(overrides: Partial<RealtimeBattleEntity> = {}): RealtimeBattleEn
     ultimateGauge: 0,
     invulnerableUntilMs: 0,
     hitStunRemainingMs: 0,
+    knockdownRemainingMs: 0,
+    getUpRemainingMs: 0,
     ...overrides,
   }
 }
@@ -146,7 +149,7 @@ describe('applyDamage', () => {
 
     expect(target.hp).toBe(200 - outcome.amount)
     expect(target.state).toBe('hit')
-    expect(target.hitStunRemainingMs).toBeGreaterThan(0)
+    expect(target.hitStunRemainingMs).toBe(BASELINE_HITSTUN_MS)
     expect(target.invulnerableUntilMs).toBeGreaterThan(1000)
     expect(target.position.x).toBe(500 + PLAYER_ATTACK.knockback)
     expect(target.position.y).toBe(500)
@@ -168,5 +171,64 @@ describe('applyDamage', () => {
     expect(target.hp).toBe(0)
     expect(target.state).toBe('dead')
     expect(target.position).toEqual({ x: 500, y: 500 })
+  })
+})
+
+describe('knockdown framework', () => {
+  it('normal mob ไม่รับ knockdown', () => {
+    const target = entity({ enemyId: 'shadow-soldier' })
+    expect(canReceiveKnockdown(target)).toBe(false)
+  })
+
+  it('elite รับ knockdown เมื่อท่าระบุ knockdown + knockdownMs', () => {
+    const attacker = entity({ id: 'player', atk: 40, facing: 'right' })
+    const target = entity({
+      enemyId: 'demon-captain',
+      hp: 200,
+      def: 0,
+      position: { x: 500, y: 500 },
+    })
+    const heavy = {
+      ...PLAYER_ATTACK,
+      knockdown: true,
+      knockdownMs: 480,
+      damageMultiplier: 0.5,
+    }
+
+    const outcome = applyDamage({
+      attacker,
+      target,
+      attack: heavy,
+      elapsedMs: 1000,
+      random: fakeRandom(0.5, 0.99),
+    })
+
+    expect(canReceiveKnockdown(target)).toBe(true)
+    expect(outcome.knockedDown).toBe(true)
+    expect(target.state).toBe('knockdown')
+    expect(target.knockdownRemainingMs).toBe(480)
+    expect(target.hitStunRemainingMs).toBe(0)
+  })
+
+  it('knockdown=true แต่ไม่มี knockdownMs = ใช้ hitstun แทน', () => {
+    const attacker = entity({ id: 'player', atk: 40, facing: 'right' })
+    const target = entity({
+      enemyId: 'demon-captain',
+      hp: 200,
+      def: 0,
+      position: { x: 500, y: 500 },
+    })
+    const incomplete = { ...PLAYER_ATTACK, knockdown: true }
+
+    applyDamage({
+      attacker,
+      target,
+      attack: incomplete,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+
+    expect(target.state).toBe('hit')
+    expect(target.hitStunRemainingMs).toBe(BASELINE_HITSTUN_MS)
   })
 })

@@ -1,6 +1,7 @@
-import { ENEMY_ATTACK, isActiveWindow } from './attacks'
+import { isActiveWindow } from './attacks'
 import { createWaveEnemies, type RealtimeBattleState } from './createRealtimeBattle'
 import { combatFacingFromVector } from './combatFacing'
+import { GET_UP_ANIMATION_MS, GET_UP_INVULNERABLE_MS } from './combatBaselines'
 import { applyDamage, type RandomFn } from './DamageSystem'
 import { createEnemyBrain, stepEnemyAI, type EnemyBrain } from './EnemyAISystem'
 import { findHitTargets } from './HitboxSystem'
@@ -291,17 +292,18 @@ export class RealtimeBattleRuntime {
   /** ศัตรูลงดาเมจใส่ผู้เล่นเมื่อท่าของมันเข้าสู่ active frame */
   private resolveEnemyAttack(enemy: RealtimeBattleEntity, brain: EnemyBrain): void {
     const state = this.state
+    const attack = brain.currentAttack
 
     if (brain.state !== 'attack') {
       brain.hitTargets.clear()
       return
     }
 
-    if (!isActiveWindow(ENEMY_ATTACK, brain.stateElapsedMs)) return
+    if (!isActiveWindow(attack, brain.stateElapsedMs)) return
 
     const targets = findHitTargets([state.player], {
       attacker: enemy,
-      attack: ENEMY_ATTACK,
+      attack,
       alreadyHit: brain.hitTargets,
       elapsedMs: state.elapsedMs,
     })
@@ -311,7 +313,7 @@ export class RealtimeBattleRuntime {
       const outcome = applyDamage({
         attacker: enemy,
         target,
-        attack: ENEMY_ATTACK,
+        attack,
         elapsedMs: state.elapsedMs,
         random: this.random,
       })
@@ -462,6 +464,23 @@ export class RealtimeBattleRuntime {
     entity.skillCooldownsMs.skill2 = Math.max(0, entity.skillCooldownsMs.skill2 - deltaMs)
     entity.skillCooldownsMs.skill3 = Math.max(0, entity.skillCooldownsMs.skill3 - deltaMs)
     entity.hitStunRemainingMs = Math.max(0, entity.hitStunRemainingMs - deltaMs)
+
+    if (entity.knockdownRemainingMs > 0) {
+      entity.knockdownRemainingMs = Math.max(0, entity.knockdownRemainingMs - deltaMs)
+      if (entity.knockdownRemainingMs <= 0) {
+        entity.state = 'getUp'
+        entity.getUpRemainingMs = GET_UP_ANIMATION_MS
+        entity.invulnerableUntilMs = this.state.elapsedMs + GET_UP_INVULNERABLE_MS
+      }
+      return
+    }
+
+    if (entity.getUpRemainingMs > 0) {
+      entity.getUpRemainingMs = Math.max(0, entity.getUpRemainingMs - deltaMs)
+      if (entity.getUpRemainingMs <= 0) {
+        entity.state = 'idle'
+      }
+    }
   }
 
   private pruneEvents(): void {

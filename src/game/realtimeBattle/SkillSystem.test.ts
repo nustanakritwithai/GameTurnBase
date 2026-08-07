@@ -40,6 +40,8 @@ function player(overrides: Partial<RealtimeBattleEntity> = {}): RealtimeBattleEn
     ultimateGauge: 0,
     invulnerableUntilMs: 0,
     hitStunRemainingMs: 0,
+    knockdownRemainingMs: 0,
+    getUpRemainingMs: 0,
     characterId: 'monkey-king',
     ...overrides,
   }

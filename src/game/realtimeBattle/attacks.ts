@@ -1,3 +1,5 @@
+import { BASELINE_HITSTUN_MS, MOB_TELEGRAPH_MS } from './combatBaselines'
+
 /**
  * นิยามท่าโจมตีทั้งหมด — แหล่งความจริงจุดเดียว (§13)
  *
@@ -11,6 +13,28 @@
  *   recovery = ชักท่ากลับ (ยังสั่งท่าใหม่ไม่ได้)
  * ────────────────────────────────────────────────────────────
  */
+
+export type MovePhase = 'cast' | 'startup' | 'active' | 'recovery'
+
+export type MoveEffectKind = 'damage' | 'heal' | 'buff' | 'debuff' | 'cc' | 'summon'
+
+export interface MoveEffect {
+  kind: MoveEffectKind
+  target:
+    'self' | 'singleEnemy' | 'nearestEnemy' | 'allEnemies' | 'singleAlly' | 'allAllies' | 'aoe'
+  amount?: number
+  buffId?: string
+  durationMs?: number
+  ccType?: 'stun' | 'slow' | 'root' | 'silence'
+  summonEntityId?: string
+  summonMaxActive?: number
+  summonDurationMs?: number
+}
+
+export interface PhaseOverride {
+  interruptible?: boolean
+  movementDuringCast?: 'none' | 'reduced' | 'full'
+}
 
 export interface AttackDefinition {
   id: string
@@ -39,6 +63,32 @@ export interface AttackDefinition {
   /** ระยะ depth ที่ยังโดนได้ (runtime y) — ใช้เมื่อ hitShape = horizontal */
   depthTolerance: number
   knockback: number
+
+  /** Blueprint §3.6.7 — per-move default; phaseOverrides when phases differ */
+  interruptible?: boolean
+  phaseOverrides?: Partial<Record<MovePhase, PhaseOverride>>
+  hitstunMs?: number
+  knockdown?: boolean
+  /** Required on moves with knockdown=true — duration not globally locked (P4 framework) */
+  knockdownMs?: number
+  /** Enemy/boss wind-up before startup (§3.6.8) */
+  telegraphMs?: number
+  /** Optional non-damage outcomes (#47 architecture — runtime deferred until needed) */
+  effects?: MoveEffect[]
+}
+
+export function resolveHitstunMs(attack: AttackDefinition): number {
+  return attack.hitstunMs ?? BASELINE_HITSTUN_MS
+}
+
+export function resolveTelegraphMs(attack: AttackDefinition): number {
+  return attack.telegraphMs ?? MOB_TELEGRAPH_MS
+}
+
+export function isMoveInterruptible(attack: AttackDefinition, phase: MovePhase): boolean {
+  const override = attack.phaseOverrides?.[phase]?.interruptible
+  if (override !== undefined) return override
+  return attack.interruptible ?? true
 }
 
 /**
@@ -62,6 +112,8 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     arcDegrees: 0,
     depthTolerance: 95,
     knockback: 60,
+    hitstunMs: BASELINE_HITSTUN_MS,
+    interruptible: true,
   },
   {
     id: 'monkey-attack-2',
@@ -77,6 +129,8 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     arcDegrees: 0,
     depthTolerance: 100,
     knockback: 80,
+    hitstunMs: BASELINE_HITSTUN_MS,
+    interruptible: true,
   },
   {
     id: 'monkey-attack-3',
@@ -93,6 +147,9 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     arcDegrees: 0,
     depthTolerance: 105,
     knockback: 210,
+    hitstunMs: BASELINE_HITSTUN_MS,
+    interruptible: true,
+    knockdown: false,
   },
 ]
 
@@ -129,6 +186,7 @@ export const MONKEY_SPINNING_STAFF: AttackDefinition = {
   arcDegrees: 360,
   depthTolerance: 0,
   knockback: 140,
+  interruptible: true,
 }
 
 /** สกิล 2 — พุ่งไม้เท้าแนวนอน (placeholder content, P3 framework) */
@@ -146,6 +204,7 @@ export const MONKEY_STAFF_THRUST: AttackDefinition = {
   arcDegrees: 0,
   depthTolerance: 92,
   knockback: 120,
+  interruptible: true,
 }
 
 /** สกิล 3 — กวาดไม้กว้าง (placeholder content, P3 framework) */
@@ -163,6 +222,7 @@ export const MONKEY_STAFF_SWEEP: AttackDefinition = {
   arcDegrees: 0,
   depthTolerance: 110,
   knockback: 160,
+  interruptible: true,
 }
 
 /** อัลติเมท — กระบวนทองคำรุนแรง (placeholder content, P3 framework) */
@@ -180,6 +240,13 @@ export const MONKEY_GOLDEN_FURY: AttackDefinition = {
   arcDegrees: 360,
   depthTolerance: 0,
   knockback: 200,
+  interruptible: false,
+  phaseOverrides: {
+    cast: { interruptible: false },
+    startup: { interruptible: false },
+    active: { interruptible: true },
+    recovery: { interruptible: true },
+  },
 }
 
 /** ค่าจังหวะของสกิล (Blueprint v3 P3) — อยู่ที่เดียว ห้าม hard-code กระจายหลายไฟล์ */
@@ -207,6 +274,10 @@ export const ENEMY_ATTACK: AttackDefinition = {
   arcDegrees: 0,
   depthTolerance: 88,
   knockback: 90,
+  telegraphMs: MOB_TELEGRAPH_MS,
+  hitstunMs: BASELINE_HITSTUN_MS,
+  interruptible: true,
+  knockdown: false,
 }
 
 export function totalDurationMs(attack: AttackDefinition): number {

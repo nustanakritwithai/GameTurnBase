@@ -7,8 +7,10 @@ import type { RealtimeBattleEntity } from './types'
 import type { Player } from '../../types/player'
 import { EMPTY_PROGRESS } from '../../types/player'
 
-const ATTACK_TOTAL_MS =
+const ATTACK_PHASE_MS =
   ENEMY_ATTACK_TIMING.startupMs + ENEMY_ATTACK_TIMING.activeMs + ENEMY_ATTACK_TIMING.recoveryMs
+
+const ATTACK_TOTAL_MS = ENEMY_ATTACK_TIMING.telegraphMs + ATTACK_PHASE_MS
 
 function makePlayer(): Player {
   return {
@@ -59,6 +61,8 @@ function entity(overrides: Partial<RealtimeBattleEntity> = {}): RealtimeBattleEn
     ultimateGauge: 0,
     invulnerableUntilMs: 0,
     hitStunRemainingMs: 0,
+    knockdownRemainingMs: 0,
+    getUpRemainingMs: 0,
     enemyId: 'shadow-soldier',
     ...overrides,
   }
@@ -66,6 +70,18 @@ function entity(overrides: Partial<RealtimeBattleEntity> = {}): RealtimeBattleEn
 
 const template = getEnemyTemplate('shadow-soldier')
 if (!template) throw new Error('ไม่พบแม่แบบ shadow-soldier')
+
+function advanceEnemyAI(
+  enemy: RealtimeBattleEntity,
+  brain: ReturnType<typeof createEnemyBrain>,
+  player: RealtimeBattleEntity,
+  totalMs: number,
+) {
+  const stepMs = 16
+  for (let t = 0; t < totalMs; t += stepMs) {
+    stepEnemyAI(enemy, brain, player, stepMs)
+  }
+}
 
 describe('stepEnemyAI', () => {
   it('อยู่ไกลเกิน detectRange = ไม่ขยับ', () => {
@@ -97,7 +113,7 @@ describe('stepEnemyAI', () => {
     expect(decision.move.y).toBeCloseTo(0)
   })
 
-  it('เข้าระยะโจมตีแล้วเปลี่ยนเป็นท่าโจมตี และหยุดเดินตลอดท่า', () => {
+  it('เข้าระยะโจมตีแล้วเข้า telegraph ก่อน attack และหยุดเดินตลอดท่า', () => {
     const enemy = entity({ position: { x: 0, y: 0 } })
     const player = entity({
       id: 'player',
@@ -107,14 +123,17 @@ describe('stepEnemyAI', () => {
     const brain = createEnemyBrain()
 
     stepEnemyAI(enemy, brain, player, 16) // → chase
-    const decision = stepEnemyAI(enemy, brain, player, 16) // → attack
+    const telegraph = stepEnemyAI(enemy, brain, player, 16) // → telegraph
 
-    expect(brain.state).toBe('attack')
-    expect(enemy.state).toBe('attack')
-    expect(decision.move).toEqual({ x: 0, y: 0 })
+    expect(brain.state).toBe('telegraph')
+    expect(enemy.state).toBe('telegraph')
+    expect(telegraph.move).toEqual({ x: 0, y: 0 })
     expect(enemy.attackCooldownRemainingMs).toBe(template.attackCooldownMs)
 
-    // ระหว่างท่ายังไม่จบ ต้องไม่ขยับเลยแม้ผู้เล่นจะอยู่ไกลออกไป
+    stepEnemyAI(enemy, brain, player, ENEMY_ATTACK_TIMING.telegraphMs + 16)
+    expect(brain.state).toBe('attack')
+    expect(enemy.state).toBe('attack')
+
     const during = stepEnemyAI(enemy, brain, player, ENEMY_ATTACK_TIMING.startupMs)
     expect(brain.state).toBe('attack')
     expect(during.move).toEqual({ x: 0, y: 0 })
@@ -131,7 +150,7 @@ describe('stepEnemyAI', () => {
 
     stepEnemyAI(enemy, brain, player, 16)
     stepEnemyAI(enemy, brain, player, 16)
-    stepEnemyAI(enemy, brain, player, ATTACK_TOTAL_MS)
+    advanceEnemyAI(enemy, brain, player, ATTACK_TOTAL_MS)
     expect(brain.state).toBe('recover')
 
     stepEnemyAI(enemy, brain, player, 500)

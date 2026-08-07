@@ -1,59 +1,63 @@
-import { ENEMY_ATTACK } from './attacks'
+import { resolveTelegraphMs, totalDurationMs, type AttackDefinition } from './attacks'
 import { faceTargetHorizontally } from './combatFacing'
-import { getEnemyTemplate, type RealtimeEnemyTemplate } from './stageConfig'
+import { getEnemyPrimaryAttack, getEnemyTemplate, type RealtimeEnemyTemplate } from './stageConfig'
 import type { RealtimeBattleEntity, Vec2 } from './types'
 
 /**
  * สมองของศัตรู — ตัดสินใจอย่างเดียว ไม่ขยับตัวเอง
  *
- * เหตุผลที่แยกแบบนี้: ระบบเดินมีอยู่แล้วและถูกเทสต์ไว้แล้ว (MovementSystem) การให้ AI
- * ไปเขียนโค้ดขยับตำแหน่งเองจะกลายเป็นระบบเดินชุดที่สองที่กฎไม่ตรงกัน (ขอบห้อง การชนกัน)
- * AI จึงมีหน้าที่แค่ "อยากไปทางไหน" แล้วคืนเวกเตอร์ให้ผู้เรียกส่งต่อ stepMovement
- *
- * วงจรตามสเปกข้อ 19:
- *   Spawn → Idle → Detect Player → Chase → Attack → Recover → Chase → Dead
+ * วงจร Blueprint §3.6.8:
+ *   Idle → Chase → Telegraph → AttackActive → Recovery → Chase
+ *   Hit → (Knockdown → GetUp → Chase) when rules allow
  */
 
-export type EnemyAIState = 'idle' | 'chase' | 'attack' | 'recover' | 'hit' | 'dead'
+export type EnemyAIState =
+  'idle' | 'chase' | 'telegraph' | 'attack' | 'recover' | 'hit' | 'knockdown' | 'getUp' | 'dead'
+
+export interface EnemyAttackTiming {
+  telegraphMs: number
+  startupMs: number
+  activeMs: number
+  recoveryMs: number
+}
+
+/** จังหวะท่าโจมตีศัตรู — จาก primaryAttack ของแม่แบบ (หรือ ENEMY_ATTACK) */
+export function resolveEnemyAttackTiming(attack: AttackDefinition): EnemyAttackTiming {
+  return {
+    telegraphMs: resolveTelegraphMs(attack),
+    startupMs: attack.startupMs,
+    activeMs: attack.activeMs,
+    recoveryMs: attack.recoveryMs,
+  }
+}
 
 /**
- * จังหวะของท่าโจมตีศัตรู (มิลลิวินาที) — ยึด ENEMY_ATTACK จาก attacks.ts เป็นแหล่งความจริงจุดเดียว
- *
- * export นี้คงไว้เพื่อความเข้ากันได้กับโค้ด/เทสต์เดิมที่ import ชื่อนี้ แต่ตัวเลขไม่ได้ hard-code
- * ซ้ำที่นี่อีกแล้ว — มาจาก ENEMY_ATTACK โดยตรง
+ * export คงไว้เพื่อความเข้ากันได้ — ค่าเริ่มต้นจาก ENEMY_ATTACK
+ * เทสต์/runtime ที่รู้แม่แบบควรเรียก resolveEnemyAttackTiming(getEnemyPrimaryAttack(...))
  */
-export const ENEMY_ATTACK_TIMING = {
-  startupMs: ENEMY_ATTACK.startupMs,
-  activeMs: ENEMY_ATTACK.activeMs,
-  recoveryMs: ENEMY_ATTACK.recoveryMs,
-} as const
+export const ENEMY_ATTACK_TIMING = resolveEnemyAttackTiming(
+  getEnemyPrimaryAttack(getEnemyTemplate('shadow-soldier')),
+)
 
-const ATTACK_TOTAL_MS = ENEMY_ATTACK.startupMs + ENEMY_ATTACK.activeMs + ENEMY_ATTACK.recoveryMs
-
-/** สถานะเฉพาะของศัตรูที่ไม่ได้อยู่ใน RealtimeBattleEntity (entity เป็นข้อมูลกลางของทุกฝ่าย) */
+/** สถานะเฉพาะของศัตรูที่ไม่ได้อยู่ใน RealtimeBattleEntity */
 export interface EnemyBrain {
   state: EnemyAIState
-  /**
-   * เวลาที่อยู่ในสถานะปัจจุบันมาแล้ว
-   *
-   * ระบบดาเมจในงานถัดไปใช้ค่านี้คู่กับ ENEMY_ATTACK_TIMING เพื่อรู้ว่าอยู่ใน active frame
-   * หรือยัง — ไม่ต้องเก็บ timestamp แยกอีกตัว
-   */
   stateElapsedMs: number
-  /**
-   * ผู้เล่นที่โดนท่านี้ไปแล้ว — กัน hitbox เดียวกันโดนซ้ำในท่าเดียว (§15)
-   *
-   * ล้างเมื่อออกจากสถานะ attack ไม่ใช่ตอนเข้า เพราะ active frame กินหลายเฟรมจำลอง
-   */
+  /** ท่าที่กำลังร่าย — ผูกกับแม่แบบตอนเข้า telegraph */
+  currentAttack: AttackDefinition
   hitTargets: Set<string>
 }
 
 export function createEnemyBrain(): EnemyBrain {
-  return { state: 'idle', stateElapsedMs: 0, hitTargets: new Set() }
+  return {
+    state: 'idle',
+    stateElapsedMs: 0,
+    currentAttack: getEnemyPrimaryAttack(null),
+    hitTargets: new Set(),
+  }
 }
 
 export interface EnemyDecision {
-  /** ทิศที่อยากเดินไป — ศูนย์คือหยุดอยู่กับที่ */
   move: Vec2
 }
 
@@ -67,12 +71,10 @@ function toState(brain: EnemyBrain, next: EnemyAIState): void {
   brain.stateElapsedMs = 0
 }
 
-/**
- * เดินสมองของศัตรูหนึ่งตัวไปหนึ่ง tick
- *
- * แก้ `brain` และ `enemy.state` โดยตรง (mutable ตามสถาปัตยกรรมของ runtime)
- * แล้วคืนทิศที่อยากเดิน ให้ผู้เรียกเอาไปป้อน stepMovement
- */
+function attackPhaseMs(attack: AttackDefinition): number {
+  return totalDurationMs(attack)
+}
+
 export function stepEnemyAI(
   enemy: RealtimeBattleEntity,
   brain: EnemyBrain,
@@ -81,17 +83,28 @@ export function stepEnemyAI(
 ): EnemyDecision {
   brain.stateElapsedMs += deltaMs
 
-  // ตายแล้วหยุดทุกอย่าง ไม่คิด ไม่เดิน ไม่โจมตี (§19)
   if (enemy.hp <= 0 || enemy.state === 'dead') {
     toState(brain, 'dead')
     enemy.state = 'dead'
     return { move: { x: 0, y: 0 } }
   }
 
-  // โดนตีจนเซ = ขยับไม่ได้ และท่าโจมตีที่ค้างอยู่ถูกยกเลิก
+  if (enemy.knockdownRemainingMs > 0) {
+    toState(brain, 'knockdown')
+    enemy.state = 'knockdown'
+    return { move: { x: 0, y: 0 } }
+  }
+
+  if (enemy.getUpRemainingMs > 0) {
+    toState(brain, 'getUp')
+    enemy.state = 'getUp'
+    return { move: { x: 0, y: 0 } }
+  }
+
   if (enemy.hitStunRemainingMs > 0) {
     toState(brain, 'hit')
     enemy.state = 'hit'
+    brain.hitTargets.clear()
     return { move: { x: 0, y: 0 } }
   }
 
@@ -99,27 +112,49 @@ export function stepEnemyAI(
   const ranges = resolveRanges(template)
   const distance = distanceBetween(enemy.position, player.position)
   const playerAlive = player.hp > 0
+  const attack = brain.currentAttack
+  const timing = resolveEnemyAttackTiming(attack)
+  const attackMs = attackPhaseMs(attack)
 
   switch (brain.state) {
+    case 'telegraph': {
+      enemy.state = 'telegraph'
+      if (brain.stateElapsedMs >= timing.telegraphMs) {
+        brain.stateElapsedMs -= timing.telegraphMs
+        brain.state = 'attack'
+        enemy.state = 'attack'
+      }
+      return { move: { x: 0, y: 0 } }
+    }
+
     case 'attack': {
-      // อยู่ในท่าโจมตี: หยุดเดินจนกว่าจะจบท่า (§19 หยุดเดินขณะโจมตี)
       enemy.state = 'attack'
-      if (brain.stateElapsedMs >= ATTACK_TOTAL_MS) toState(brain, 'recover')
+      if (brain.stateElapsedMs >= attackMs) {
+        brain.stateElapsedMs -= attackMs
+        brain.state = 'recover'
+        brain.hitTargets.clear()
+        enemy.state = 'idle'
+      }
       return { move: { x: 0, y: 0 } }
     }
 
     case 'recover': {
       enemy.state = 'idle'
       if (brain.stateElapsedMs >= RECOVER_MS) {
+        brain.stateElapsedMs -= RECOVER_MS
         toState(brain, playerAlive && distance <= ranges.detect ? 'chase' : 'idle')
       }
       return { move: { x: 0, y: 0 } }
     }
 
     case 'hit': {
-      // พ้นอาการเซแล้วกลับไปไล่ต่อทันที
       toState(brain, playerAlive && distance <= ranges.detect ? 'chase' : 'idle')
       enemy.state = 'idle'
+      return { move: { x: 0, y: 0 } }
+    }
+
+    case 'knockdown':
+    case 'getUp': {
       return { move: { x: 0, y: 0 } }
     }
 
@@ -132,13 +167,13 @@ export function stepEnemyAI(
 
       if (distance <= ranges.attack && enemy.attackCooldownRemainingMs <= 0) {
         faceTargetHorizontally(enemy, player.position)
-        toState(brain, 'attack')
-        enemy.state = 'attack'
+        brain.currentAttack = getEnemyPrimaryAttack(template)
+        toState(brain, 'telegraph')
+        enemy.state = 'telegraph'
         enemy.attackCooldownRemainingMs = ranges.attackCooldownMs
         return { move: { x: 0, y: 0 } }
       }
 
-      // เข้าใกล้พอแล้วแต่ยังคูลดาวน์อยู่ = ยืนรอ ไม่เบียดทับผู้เล่น
       if (distance <= ranges.attack) {
         enemy.state = 'idle'
         return { move: { x: 0, y: 0 } }
@@ -158,10 +193,8 @@ export function stepEnemyAI(
   }
 }
 
-/** เวลาพักหลังจบท่าโจมตี ก่อนกลับไปไล่ใหม่ */
 const RECOVER_MS = 260
 
-/** ค่าเริ่มต้นเมื่อไม่พบแม่แบบศัตรู — ยังเล่นต่อได้แทนที่จะพังทั้งห้อง */
 const FALLBACK_RANGES = { detect: 500, attack: 80, attackCooldownMs: 1500 }
 
 function resolveRanges(template: RealtimeEnemyTemplate | null) {

@@ -1,6 +1,7 @@
 import { TEMPLE_LOBBY_BG, BATTLE_ART_BG } from '../backgroundAssets'
+import { ENEMY_ATTACK, type AttackDefinition } from './attacks'
 import type { CharacterModelKind } from '../characters'
-import type { Vec2 } from './types'
+import type { EnemyTier, Vec2 } from './types'
 
 /**
  * ข้อมูลด่านของห้องต่อสู้ real-time — แหล่งความจริงจุดเดียว
@@ -51,6 +52,10 @@ export interface RealtimeEnemyTemplate {
   /** ระยะที่เข้าโจมตีได้ */
   attackRange: number
   attackCooldownMs: number
+  /** §3.6.8 — normal | elite | boss; same AI core for all */
+  tier: EnemyTier
+  /** Per-enemy move row — defaults to ENEMY_ATTACK when omitted */
+  primaryAttack?: AttackDefinition
 }
 
 export interface BattleWaveDefinition {
@@ -90,6 +95,7 @@ export const ENEMY_TEMPLATES: Record<string, RealtimeEnemyTemplate> = {
     detectRange: 1600,
     attackRange: 74,
     attackCooldownMs: 1500,
+    tier: 'normal',
   },
   'demon-captain': {
     id: 'demon-captain',
@@ -105,6 +111,7 @@ export const ENEMY_TEMPLATES: Record<string, RealtimeEnemyTemplate> = {
     detectRange: 1700,
     attackRange: 86,
     attackCooldownMs: 1700,
+    tier: 'elite',
   },
   'spirit-guardian': {
     id: 'spirit-guardian',
@@ -120,6 +127,7 @@ export const ENEMY_TEMPLATES: Record<string, RealtimeEnemyTemplate> = {
     detectRange: 1600,
     attackRange: 78,
     attackCooldownMs: 1300,
+    tier: 'normal',
   },
 }
 
@@ -191,4 +199,8 @@ export function getRealtimeStage(id: string): RealtimeBattleStage | null {
 
 export function getEnemyTemplate(id: string): RealtimeEnemyTemplate | null {
   return ENEMY_TEMPLATES[id] ?? null
+}
+
+export function getEnemyPrimaryAttack(template: RealtimeEnemyTemplate | null): AttackDefinition {
+  return template?.primaryAttack ?? ENEMY_ATTACK
 }

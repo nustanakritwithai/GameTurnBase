@@ -94,7 +94,12 @@ export function stepMovement(
   { stage, blockers }: MovementContext,
 ): boolean {
   // ตายแล้ว หรือกำลังเซจากการโดนตี = ขยับไม่ได้ (§11)
-  if (entity.state === 'dead' || entity.hitStunRemainingMs > 0) {
+  if (
+    entity.state === 'dead' ||
+    entity.hitStunRemainingMs > 0 ||
+    entity.knockdownRemainingMs > 0 ||
+    entity.getUpRemainingMs > 0
+  ) {
     entity.velocity = { x: 0, y: 0 }
     return false
   }

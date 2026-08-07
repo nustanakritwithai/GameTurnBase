@@ -41,10 +41,13 @@ function animationForState(state: EntityState): BattleAnimationId {
     case 'walk':
       return 'walk'
     case 'attack':
+    case 'telegraph':
       return 'attack-1'
     case 'skill':
       return 'skill-1'
     case 'hit':
+    case 'knockdown':
+    case 'getUp':
       return 'hit'
     case 'dead':
       return 'death'
@@ -110,7 +113,9 @@ export function EntitySprite({ runtime, entityId, kind, accent }: EntitySpritePr
 
     // ตายแล้วค่อย ๆ จางหาย, โดนตีแล้ววาบสีแดง — ทั้งสองท่าไม่มีเฟรมภาพของตัวเอง
     material.opacity = entity.state === 'dead' ? 0.35 : 1
-    material.color.set(entity.state === 'hit' ? '#ff9d9d' : '#ffffff')
+    const isHurt =
+      entity.state === 'hit' || entity.state === 'knockdown' || entity.state === 'getUp'
+    material.color.set(isHurt ? '#ff9d9d' : entity.state === 'telegraph' ? '#ffd4a3' : '#ffffff')
 
     if (shadow.current) {
       shadow.current.visible = entity.state !== 'dead'
