@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-07T20:25:00+07:00 by `Cursor Agent (cloud)` (#38 Gacha direction locked — deferred P9, no rate/pity numbers)
+> **Last Updated**: 2026-08-07T20:30:00+07:00 by `Cursor Agent (cloud)` (#33 FINAL homework comment — complete Ring 0 delivery)
 > **RULES_VERSION last synced: 17** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
