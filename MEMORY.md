@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-07T20:00:00+07:00 by `Cursor Agent (cloud)` (Ring 0 final supersede — #33/#34/#36/#41 + P8/P13 baselines #35/#39/#40/#44)
+> **Last Updated**: 2026-08-07T20:15:00+07:00 by `Cursor Agent (cloud)` (completed missing issue comments — damage formula, entity states, #43 resolved, master #33 summary)
 > **RULES_VERSION last synced: 17** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
