@@ -7,6 +7,51 @@
 
 ---
 
+## ⚠️ กฎเหล็ก — อ่านก่อนประกาศ "ส่งงานแล้ว"
+
+### Fork PR **ไม่ใช่** การส่งงานเข้าระบบหลัก
+
+| สถานะ                                                   | ความหมาย                                                               | ห้ามพูดว่า                                                           |
+| ------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| มีแค่ PR บน **fork** (`nustanakritwithai/GameTurnBase`) | งานยัง **ไม่เข้า** canonical · deploy/release **ไม่เกิด**              | ❌ "ส่งงานแล้ว" · ❌ "พร้อม merge upstream" · ❌ "แจ้ง Backend แล้ว" |
+| มี PR บน **upstream** (`KatomnoiStudio/LegendOfSoulTH`) | ส่งงานถูกที่แล้ว · รอ review/merge                                     | ✅ "Upstream PR: \<url\>"                                            |
+| Bot push upstream ไม่ได้ (403)                          | **BLOCKED** — ต้องให้ HetCreep เปิด **cross-repo PR** หรือ cherry-pick | ✅ "BLOCKED: ต้องเปิด upstream PR" + ขั้นตอนด้านล่าง §6              |
+
+**ตัวอย่างผิด (ห้ามทำซ้ำ):**
+
+```text
+ส่งงานแล้วครับ
+Fork PR: https://github.com/nustanakritwithai/GameTurnBase/pull/61
+Upstream: bot push ไม่ได้ — รอเปิด cross-repo PR เอง
+```
+
+นี่คือ **ยังไม่ส่งเข้าระบบหลัก** — fork PR เป็นแค่ที่เก็บ branch ชั่วคราว
+
+**ตัวอย่างถูก:**
+
+```text
+สถานะ: BLOCKED — upstream PR ยังไม่มี (bot 403)
+
+Branch พร้อมแล้ว: nustanakritwithai:cursor/mobile-combat-ui-e117
+HetCreep เปิด PR:
+  base  KatomnoiStudio/LegendOfSoulTH:master
+  head  nustanakritwithai:cursor/mobile-combat-ui-e117
+
+ลิงก์สร้าง PR:
+  https://github.com/KatomnoiStudio/LegendOfSoulTH/compare/master...nustanakritwithai:cursor/mobile-combat-ui-e117?expand=1
+
+npm run ci: green (223 tests) · MEMORY.md ใน branch แล้ว
+```
+
+**เมื่อ upstream PR เปิดแล้ว** ค่อยรายงาน:
+
+```text
+Upstream PR: https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/XX
+(Fork PR #61 — ปิด/supersede ได้หลัง merge upstream)
+```
+
+---
+
 ## 1. รู้ให้ชัด — repo ไหนทำอะไร
 
 | Repo                                 | บทบาท                                                  | Agent ทำอะไรได้                                                                       |
@@ -57,7 +102,7 @@ Verify → push → PR → merge upstream
 2. Implement **เฉพาะ contract ที่ล็อก** — ถ้าเจอตัวเลข/TBD ที่ยังไม่ lock → **หยุดส่วนนั้น** เปิด gap แทนการเดา
 3. Branch แยกจาก `master` ล่าสุด
 4. `npm run ci` ต้อง green ก่อน push
-5. เปิด PR ไป **`KatomnoiStudio/LegendOfSoulTH` `master`**
+5. เปิด PR ไป **`KatomnoiStudio/LegendOfSoulTH` `master`** — **ไม่ใช่** PR ไป fork แล้วบอกว่าส่งงานแล้ว (ดู §0)
 6. หนึ่งงานจบ = หนึ่ง PR topic (`.agents/rules/commit-granularity-law.md`)
 
 ---
@@ -136,7 +181,55 @@ cursor/<descriptive-kebab-name>-e117
 
 ---
 
-## 6. Sync docs จาก fork → upstream (canonical)
+## 6. Bot ไม่มีสิทธิ์ push upstream (403) — ทำอย่างไร
+
+Cloud agent มัก push ได้แค่ **fork** (`origin`) ไม่ใช่ `KatomnoiStudio/LegendOfSoulTH` (`upstream`)
+
+### Agent ต้องทำ
+
+1. Push branch ไป fork: `git push -u origin cursor/<topic>-e117`
+2. `npm run ci` green · `MEMORY.md` อยู่ใน branch
+3. **ห้าม**ประกาศ "ส่งงานแล้ว" / "พร้อม merge upstream"
+4. รายงานสถานะ **`BLOCKED`** พร้อมข้อมูลครบ (template §0):
+   - ชื่อ branch (`nustanakritwithai:cursor/...`)
+   - ลิงก์ compare สร้าง cross-repo PR
+   - สรุปเนื้องาน + test count
+5. **ห้าม**เปิด fork PR แล้วถือว่าจบ — ถ้าเปิด fork PR ไปแล้ว ให้ระบุชัดว่า **"fork PR only — not canonical delivery"**
+
+### HetCreep / มนุษย์เปิด upstream PR (cross-repo)
+
+**วิธี GitHub UI:**
+
+1. ไปที่ `https://github.com/KatomnoiStudio/LegendOfSoulTH`
+2. Pull requests → New pull request
+3. **base:** `KatomnoiStudio/LegendOfSoulTH` → `master`
+4. **compare:** `nustanakritwithai:cursor/<branch>-e117`
+5. เปิด PR · review · merge
+
+**ลิงก์ compare สำเร็จรูป (แทนที่ `<branch>`):**
+
+```
+https://github.com/KatomnoiStudio/LegendOfSoulTH/compare/master...nustanakritwithai:<branch>?expand=1
+```
+
+**วิธี CLI (HetCreep เครื่องที่ auth upstream ได้):**
+
+```bash
+gh pr create \
+  --repo KatomnoiStudio/LegendOfSoulTH \
+  --base master \
+  --head nustanakritwithai:cursor/<branch>-e117 \
+  --title "feat: ..." \
+  --body "..."
+```
+
+### ทางเลือก: cherry-pick เข้า upstream โดยตรง
+
+ถ้าไม่ใช้ cross-repo PR — checkout `upstream/master`, cherry-pick commit จาก fork branch, push branch ใหม่บน upstream repo (ต้องมีสิทธิ์ write)
+
+---
+
+## 7. Sync docs จาก fork → upstream (canonical)
 
 ใช้เมื่อ docs ผ่าน validation บน fork แล้ว ต้องเข้า `KatomnoiStudio/LegendOfSoulTH`
 
@@ -164,7 +257,7 @@ cursor/<descriptive-kebab-name>-e117
 
 4. แก้ conflict ด้วยมือ — **ห้าม force-push** · **ห้าม overwrite** งาน upstream ที่ไม่เกี่ยว
 5. Commit + push + PR ไป **upstream**
-6. ถ้า bot ไม่มีสิทธิ์ push upstream (403) → ทิ้ง branch/PR พร้อม merge บน fork ให้ HetCreep cherry-pick เอง และ **รายงานชัดเจน**ใน PR body
+6. ถ้า bot ไม่มีสิทธิ์ push upstream (403) → รายงาน **BLOCKED** + ลิงก์ compare (§6) — **ห้าม**เขียนว่าส่งงานแล้ว
 
 ### ไฟล์ที่มักต้อง sync
 
@@ -174,7 +267,7 @@ cursor/<descriptive-kebab-name>-e117
 
 ---
 
-## 7. ส่งงาน code เข้าระบบหลัก
+## 8. ส่งงาน code เข้าระบบหลัก
 
 ### Checklist ก่อนประกาศ "เสร็จ"
 
@@ -182,7 +275,8 @@ cursor/<descriptive-kebab-name>-e117
 - [ ] Ring 0 lock ที่เกี่ยวข้องอยู่ใน Blueprint แล้ว (ไม่เดา numerics ที่ยัง TBD)
 - [ ] `npm run ci` green
 - [ ] `MEMORY.md` อัปเดต + identity stamp
-- [ ] Branch pushed · PR เปิดไป **upstream** `master`
+- [ ] **Upstream PR URL** มีจริง — หรือรายงาน **BLOCKED** พร้อม compare link (§6)
+- [ ] **ห้าม**เขียนว่า "ส่งงานแล้ว" ถ้ามีแค่ fork PR
 - [ ] PR แยก docs/code ตามขอบเขต
 - [ ] ไม่มี conflict marker ค้างในไฟล์
 - [ ] Scope guard: ไม่แอบ implement phase อื่น (เช่น P4 PR ห้ามแอบ P5/P8/P9)
@@ -194,7 +288,7 @@ cursor/<descriptive-kebab-name>-e117
 
 ---
 
-## 8. Ring 0 vs Ring 1
+## 9. Ring 0 vs Ring 1
 
 |                           | Ring 0 (HetCreep)   | Ring 1 (agent อื่น)                      |
 | ------------------------- | ------------------- | ---------------------------------------- |
@@ -205,21 +299,22 @@ cursor/<descriptive-kebab-name>-e117
 
 ---
 
-## 9. ข้อผิดพลาดที่พบบ่อย — ห้ามทำ
+## 10. ข้อผิดพลาดที่พบบ่อย — ห้ามทำ
 
-| ผิด                                             | ที่ถูก                                           |
-| ----------------------------------------------- | ------------------------------------------------ |
-| เปิด issue บน fork แล้วรอ implement ใน issue    | comment + ปิด issue · implement ผ่าน upstream PR |
-| Docs + code ใน PR เดียว                         | แยก PR                                           |
-| Push โดยไม่ merge master ล่าสุด                 | pre-push sync ก่อนเสมอ                           |
-| ส่งโค้ดโดยไม่มี `MEMORY.md`                     | MEMORY ต้องไปกับ delivery เดียวกัน               |
-| Force-push upstream                             | cherry-pick / merge ด้วยมือ                      |
-| ถือ fork master เป็น canonical                  | upstream `KatomnoiStudio/LegendOfSoulTH`         |
-| เดา maxLevel, gacha rate, star cost ที่ยัง OPEN | หยุด · บันทึก gap · รอ Ring 0                    |
+| ผิด                                                      | ที่ถูก                                                            |
+| -------------------------------------------------------- | ----------------------------------------------------------------- |
+| เปิด fork PR แล้วบอก "ส่งงานแล้ว / พร้อม merge upstream" | รายงาน **BLOCKED** + upstream compare link · หรือ upstream PR URL |
+| แจ้ง Backend โดยอ้าง fork PR เป็น delivery               | อ้าง **upstream PR** เท่านั้น · fork PR = staging เท่านั้น        |
+| Docs + code ใน PR เดียว                                  | แยก PR                                                            |
+| Push โดยไม่ merge master ล่าสุด                          | pre-push sync ก่อนเสมอ                                            |
+| ส่งโค้ดโดยไม่มี `MEMORY.md`                              | MEMORY ต้องไปกับ delivery เดียวกัน                                |
+| Force-push upstream                                      | cherry-pick / merge ด้วยมือ                                       |
+| ถือ fork master เป็น canonical                           | upstream `KatomnoiStudio/LegendOfSoulTH`                          |
+| เดา maxLevel, gacha rate, star cost ที่ยัง OPEN          | หยุด · บันทึก gap · รอ Ring 0                                     |
 
 ---
 
-## 10. อ้างอิงกฎที่เกี่ยวข้อง
+## 11. อ้างอิงกฎที่เกี่ยวข้อง
 
 | หัวข้อ              | ไฟล์                                      |
 | ------------------- | ----------------------------------------- |

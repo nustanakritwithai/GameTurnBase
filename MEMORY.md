@@ -4,7 +4,7 @@
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
 > **Last Updated**: 2026-08-07T20:50:00+07:00 by `Cursor Agent (cloud)` (upstream submission workflow rule §16)
-> **RULES_VERSION last synced: 18** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
+> **RULES_VERSION last synced: 19** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
 > tracks from concurrent sessions/forks) and was getting expensive to read every session. Compressed to
@@ -40,7 +40,7 @@
 - **Org rename → `KatomnoiStudio` (2026-08-07)**: GitHub org `LegendofSoulTH` renamed by HetCreep via web UI (rename isn't exposed via REST API — verified live, `PATCH /orgs/{org}` silently no-ops on `login`). Live Pages URL is NOT covered by GitHub's redirect (old `legendofsoulth.github.io` confirmed 404 live) — new live URL: https://katomnoistudio.github.io/LegendOfSoulTH/
 - **Real backend: Supabase LIVE (2026-08-07)**: `useAuth.ts` wired to Supabase Auth + Postgres RPCs (`earn_gold`/`grant_item`/`redeem_coupon`/`grant_character`, all `SECURITY DEFINER` so ledger rules are DB-enforced) — localStorage accounts discarded (accepted trade-off, few/no real players on a brand-new project). `accountRepository.ts` stays in the tree as an untouched fallback seam only. CI injects `VITE_SUPABASE_*` at build (org-level secret, item 87); `main.tsx` dynamic-imports `App` so a missing/rotated secret degrades to a fallback screen instead of a blank page (item 88).
 - **Master Blueprint v3.0**: **§1.2–§1.9 Theme LOCKED** · #46–#54 closed · open PRs: docs [#59](https://github.com/nustanakritwithai/GameTurnBase/pull/59) · P4 code [#58](https://github.com/nustanakritwithai/GameTurnBase/pull/58)
-- **Agent workflow**: `.agents/rules/upstream-submission-workflow.md` — ส่งงานเข้า `KatomnoiStudio/LegendOfSoulTH` (docs/code PR แยก · fork = Q&A only · cherry-pick docs ห้าม force)
+- **Agent workflow**: `.agents/rules/upstream-submission-workflow.md` — **fork PR ≠ ส่งงานแล้ว** · upstream PR URL หรือ BLOCKED+compare link · ตัวอย่างผิด: fork #61 แจ้ง "พร้อม merge upstream"
 - **Battle (CURRENT)**: realtime · 2.5D side-down · L/R + lunge · 3 skills + ultimate (P3) · no global soft-target (#33 Attack Snap superseded); **Ult skill-only lock** (หนุมาน §3.7)
 - **P8/P13 baselines**: #35 ★6≤130%★1 · #40 cap 60 · #39 Elo/7-tier/K32 · #44 client-predict+reconcile @ P12 · **#53** skill level architecture only (numerics P8) · **#54** star ascension architecture only (numerics P9) · **#38** gacha numerics P9
 
