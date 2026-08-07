@@ -91,12 +91,21 @@ Do **not** plan or implement these until HetCreep reopens them:
 
 # §3 — Combat model
 
-## 3.1 Movement (LOCKED)
+## 3.1 Movement & coordinates (LOCKED)
 
 - Field: **2.5D plane**
 - Move: **left, right, up, down, diagonal** (joystick vector OK)
 - **Up/down = depth** positioning to align with enemies
 - Movement and attack direction are **separate systems**
+
+**Canonical battle coordinates (LOCKED — backfill P1 contract, matches shipped `src/game/realtimeBattle/battleCoordinates.ts`):**
+
+| Axis                           | Runtime meaning                                | Notes                                                                        |
+| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| **battle X**                   | Horizontal left / right                        | Combat logic, collision, AI, hitboxes                                        |
+| **battle depth** (`runtime.y`) | Screen-plane up / down (front ↔ back on arena) | Lower = farther from camera / back lane; higher = nearer camera / front lane |
+
+**Rendering contract:** presentation layer maps battle coordinates → Three.js world axes (`runtime.x` → `worldX`, `runtime.y` → `worldZ`; `worldY` = height only). **Combat logic must not use raw render Z/Y as depth** — always use canonical battle X + battle depth.
 
 ## 3.2 Attack axis (LOCKED)
 
@@ -122,7 +131,13 @@ Do **not** plan or implement these until HetCreep reopens them:
 - **Skills S1–S3 / Ultimate:** numeric/icon slots — **art icons TBD** (placeholder until assets land)
 - **Ultimate when gauge empty:** button **pressable but no effect** (no disabled state required)
 
-**PC keybinds (LOCKED):** Attack `J` / `Space` · S1 `1`/`E` · S2 `2`/`R` · S3 `3`/`F` · Ultimate `4`/`Q`
+**PC keybinds (LOCKED):**
+
+| Action                      | Keys                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Movement**                | `W` `A` `S` `D` **and** Arrow Keys — **equivalent to virtual joystick**; diagonal from simultaneous keys |
+| **Attack**                  | `J` / `Space`                                                                                            |
+| **S1 / S2 / S3 / Ultimate** | `1`/`E` · `2`/`R` · `3`/`F` · `4`/`Q`                                                                    |
 
 **No separate Dash button.**
 
@@ -155,7 +170,7 @@ PC: keyboard/mouse/controller-ready; same action layer.
 | Mobile layout                                | Joystick left + S1/S2/S3/U + large Attack bottom-right (§3.3)                                |
 | Dash button                                  | **CUT** — not in UI                                                                          |
 | Soft-target / auto-snap / hard lock (global) | **CUT** for basic movement, facing, and basic attack — player positions depth + L/R manually |
-| Skill-specific target lock                   | **Allowed per skill definition only** (e.g. Ultimate — see §3.9); not a global assist        |
+| Skill-specific target lock                   | **Allowed per skill definition only** (e.g. Ultimate — see §3.7); not a global assist        |
 | `combatFacing` source                        | Movement / joystick vector                                                                   |
 | Vertical-only movement                       | **Keep previous facing** (no auto flip)                                                      |
 | Walk + Attack/Skill                          | **Allowed** simultaneously                                                                   |
@@ -202,22 +217,39 @@ Future **hyper armor / uninterruptible** windows are allowed per move design.
 
 Every attack/skill definition should carry its own data (extend `AttackDefinition` / skill defs in implementation PRs):
 
-| Property                                | Purpose                                                               |
-| --------------------------------------- | --------------------------------------------------------------------- |
-| `startupMs` / `activeMs` / `recoveryMs` | Phase timing (existing)                                               |
-| `castDelayMs`                           | Wind-up before active (skills; basic may be 0 or folded into startup) |
-| `interruptible`                         | Can this phase be cancelled by incoming hit?                          |
-| `movementDuringCast`                    | Allowed movement while casting (usually none or reduced)              |
-| `lungeDistance`                         | Forward displacement on attack (basic attack lunge)                   |
-| `hitstunMs`                             | Stun applied to target on hit                                         |
-| `knockback`                             | Push distance (existing)                                              |
-| `knockdown`                             | Whether this move can knock down                                      |
-| `multiTarget`                           | Hit all in box vs single target (basic = true)                        |
-| `hitShape` / `range` / `depthTolerance` | Hit geometry (existing P2 model)                                      |
+| Property                                | Purpose                                                                                                                                                    |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startupMs` / `activeMs` / `recoveryMs` | Phase timing (existing)                                                                                                                                    |
+| `castDelayMs`                           | Wind-up before active (skills; basic may be 0 or folded into startup)                                                                                      |
+| `interruptible`                         | **Default** — can this move be cancelled by incoming hit? (usually one bool per move)                                                                      |
+| `phaseOverrides`                        | **Optional** — per-phase overrides when phases differ: `cast` / `startup` / `active` / `recovery` each may set `interruptible`, `movementDuringCast`, etc. |
+| `movementDuringCast`                    | Allowed movement while casting (usually none or reduced)                                                                                                   |
+| `lungeDistance`                         | Forward displacement on attack (basic attack lunge)                                                                                                        |
+| `hitstunMs`                             | Stun applied to target on hit                                                                                                                              |
+| `knockback`                             | Push distance (existing)                                                                                                                                   |
+| `knockdown`                             | Whether this move can knock down                                                                                                                           |
+| `multiTarget`                           | Hit all in box vs single target (basic = true)                                                                                                             |
+| `hitShape` / `range` / `depthTolerance` | Hit geometry (existing P2 model)                                                                                                                           |
+
+**Schema rule (LOCKED):** use `interruptible` as the **move-level default**. Add `phaseOverrides` **only** when a specific phase must differ (e.g. uninterruptible clone/setup, then interruptible strike phases). **Do not** require phase-interruptible data on every move — keeps per-move data-driven and scales to boss kits.
+
+**P4 enemy moves use the same schema** as player attacks/skills.
 
 Boss/enemy attacks additionally define: `telegraphMs`, `attackShape`, phase eligibility.
 
-### 3.6.8 Enemy & boss state machine (LOCKED)
+### 3.6.8 Enemy tiers & state machine (LOCKED)
+
+#### Enemy tiers
+
+| Tier           | Definition                                        | AI core                       | Knockdown                                                                         | Notes                                                                         |
+| -------------- | ------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Normal mob** | Default P4 enemy                                  | Shared Enemy AI core          | **No** (P4 baseline — hitstun only)                                               | Ground telegraph marker                                                       |
+| **Elite**      | **Between normal mob and boss** — not a mini-boss | **Same Enemy AI core as mob** | **Per-move flag** — elite can be knocked down / apply knockdown when move says so | May add cast bar, enhanced telegraph, per-move knockdown/armor, extra moveset |
+| **Boss**       | Stage boss / multi-phase fights                   | Boss state machine + phases   | Per-move + boss rules                                                             | Cast bar, phase transitions (§3.6.9)                                          |
+
+**Elite default:** **no phase system** — elites are tougher mobs with richer telegraphs/movesets, not shrunken bosses.
+
+#### State machine (all enemy tiers)
 
 Core loop:
 
@@ -227,12 +259,12 @@ Interruption states:
 
 `Hit → (Knockdown → GetUp → Chase)` when rules allow
 
-| State                 | Notes                                                             |
-| --------------------- | ----------------------------------------------------------------- |
-| **Telegraph**         | Wind-up; player reads danger before damage                        |
-| **AttackActive**      | Damage window                                                     |
-| **Recovery**          | Punish window                                                     |
-| **Knockdown / GetUp** | Elite/boss (and specific moves) — not default for normal mob hits |
+| State                 | Notes                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| **Telegraph**         | Wind-up; player reads danger before damage                            |
+| **AttackActive**      | Damage window                                                         |
+| **Recovery**          | Punish window                                                         |
+| **Knockdown / GetUp** | Elite/boss (and specific moves) — **not** default for normal mob hits |
 
 **Telegraph feedback layers:**
 
@@ -288,35 +320,37 @@ Combat remains a **2.5D positioning-based brawler:** player controls **movement 
 
 HetCreep: set sensible defaults first; **values below are starting points**, not final balance.
 
-| Parameter                          | Initial value                              | Notes                                                 |
-| ---------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
-| `lungeDistance` (basic, per hit)   | 32 / 36 / 44                               | Hit 1 → 2 → 3; hit 3 slightly longer                  |
-| `hitstunMs` (normal basic on hit)  | 200                                        | Short stun before resume                              |
-| `knockback` (basic)                | keep `attacks.ts` chain values             | Tune in playtest                                      |
-| `castDelayMs` S1 / S2 / S3 / Ult   | 0\* / 250 / 320 / 480                      | \*S1 folded into existing startup                     |
-| `interruptible` (default skill)    | `true` during cast                         | Per-skill override in kit                             |
-| `interruptible` (Ultimate wind-up) | `false` during clone/setup phase           | Monkey King ult — see §3.9                            |
-| `movementDuringCast` (default)     | `none`                                     | S3 leap uses skill-driven displacement, not free walk |
-| Mob `telegraphMs`                  | 280                                        | Normal melee enemy                                    |
-| Boss `telegraphMs`                 | 800–1200                                   | Per attack row                                        |
-| Knockdown on normal mob            | **no**                                     | P4 mobs use Hit stun only                             |
-| Knockdown                          | elite/boss + heavy moves + combo finishers | Per move flag                                         |
-| Boss phase threshold               | **50% HP**                                 | **2 phases** baseline                                 |
-| `getUp` i-frames                   | 200 ms                                     | After knockdown                                       |
+| Parameter                          | Initial value                              | Notes                                                              |
+| ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
+| `lungeDistance` (basic, per hit)   | 32 / 36 / 44                               | Hit 1 → 2 → 3; hit 3 slightly longer                               |
+| `hitstunMs` (normal basic on hit)  | 200                                        | Short stun before resume                                           |
+| `knockback` (basic)                | keep `attacks.ts` chain values             | Tune in playtest                                                   |
+| `castDelayMs` S1 / S2 / S3 / Ult   | 0\* / 250 / 320 / 480                      | \*S1 folded into existing startup                                  |
+| `interruptible` (default skill)    | `true` during cast                         | Per-skill override in kit                                          |
+| `interruptible` (Ultimate wind-up) | `false` during clone/setup phase           | Monkey King ult — see §3.7; per-strike phases use `phaseOverrides` |
+| `movementDuringCast` (default)     | `none`                                     | S3 leap uses skill-driven displacement, not free walk              |
+| Mob `telegraphMs`                  | 280                                        | Normal melee enemy                                                 |
+| Boss `telegraphMs`                 | 800–1200                                   | Per attack row                                                     |
+| Knockdown on normal mob            | **no**                                     | P4 mobs use Hit stun only                                          |
+| Knockdown                          | elite/boss + heavy moves + combo finishers | Per move flag                                                      |
+| Boss phase threshold               | **50% HP**                                 | **2 phases** baseline                                              |
+| `getUp` i-frames                   | 200 ms                                     | After knockdown                                                    |
 
 ### 3.7 Reference hero kit — หนุมาน / Monkey King (LOCKED baseline)
 
 First vertical-slice kit. Other heroes follow the same **per-hero kit file** pattern.
 
-| Slot         | Name (TH)              | Design                           | Implementation notes                                                                                                                                                           |
-| ------------ | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Basic**    | โจมตีปกติ              | 3-hit combo, multi-target, lunge | §3.6.11; finisher hit 3 tuned per §3.6.12                                                                                                                                      |
-| **S1**       | กระบวนทองคำ            | Spinning staff (existing)        | Radial AoE — already shipped                                                                                                                                                   |
-| **S2**       | กระบองตีระยะไกล        | Long-range staff strike          | Horizontal or line hit; **no** target lock                                                                                                                                     |
-| **S3**       | กระโดดพุ่งทุบ          | Leap jump → slam                 | Skill-driven leap displacement; slam on landing                                                                                                                                |
-| **Ultimate** | แยก 4 ร่าง → พุ่งโจมตี | Clone split → rush               | **Skill-specific nearest-target lock**; presentation uses clone animation; **code = long-range attack skill locked to nearest enemy, 4 strike phases**; not global soft-target |
+| Slot         | Name (TH)              | Design                           | Implementation notes                                                                                                                                                   |
+| ------------ | ---------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Basic**    | โจมตีปกติ              | 3-hit combo, multi-target, lunge | §3.6.11; finisher hit 3 tuned per §3.6.12                                                                                                                              |
+| **S1**       | กระบวนทองคำ            | Spinning staff (existing)        | Radial AoE — already shipped                                                                                                                                           |
+| **S2**       | กระบองตีระยะไกล        | Long-range staff strike          | Horizontal or line hit; **no** target lock                                                                                                                             |
+| **S3**       | กระโดดพุ่งทุบ          | Leap jump → slam                 | Skill-driven leap displacement; slam on landing                                                                                                                        |
+| **Ultimate** | แยก 4 ร่าง → พุ่งโจมตี | Clone split → rush               | **`targetLock: 'nearest'`**; clone/setup wind-up **uninterruptible**; each of 4 strike phases follows **per-phase rules** via `phaseOverrides`; not global soft-target |
 
 **Ultimate exception:** only this skill (and future skills explicitly flagged `targetLock: 'nearest'`) may auto-pick a target. Basic attack and S2/S3 still use manual facing/positioning unless their kit row says otherwise.
+
+**Ultimate interrupt model:** `interruptible: false` at move default for clone/setup; strike phases may override individually (e.g. active = interruptible, recovery = not).
 
 **Next design gate (OPEN):** per-hero finisher tuning tables and additional hero kits beyond Monkey King.
 
