@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-07T19:20:00+07:00 by `Cursor Agent (cloud)` (housekeeping — PR #45 closed, #23 merged upstream)
+> **Last Updated**: 2026-08-07T19:45:00+07:00 by `Cursor Agent (cloud)` (Ring 0 locked P4 blockers #34/#36/#41/#42 — issue comments posted)
 > **RULES_VERSION last synced: 17** (see `.agents/rules/rules-freshness-check.md` — this exact line is what the check greps for)
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
@@ -39,9 +39,9 @@
 - **Version**: **0.7.0** (P3 PR — bump จาก 0.6.0 หลัง P0–P2 merge upstream)
 - **Org rename → `KatomnoiStudio` (2026-08-07)**: GitHub org `LegendofSoulTH` renamed by HetCreep via web UI (rename isn't exposed via REST API — verified live, `PATCH /orgs/{org}` silently no-ops on `login`). Live Pages URL is NOT covered by GitHub's redirect (old `legendofsoulth.github.io` confirmed 404 live) — new live URL: https://katomnoistudio.github.io/LegendOfSoulTH/
 - **Real backend: Supabase LIVE (2026-08-07)**: `useAuth.ts` wired to Supabase Auth + Postgres RPCs (`earn_gold`/`grant_item`/`redeem_coupon`/`grant_character`, all `SECURITY DEFINER` so ledger rules are DB-enforced) — localStorage accounts discarded (accepted trade-off, few/no real players on a brand-new project). `accountRepository.ts` stays in the tree as an untouched fallback seam only. CI injects `VITE_SUPABASE_*` at build (org-level secret, item 87); `main.tsx` dynamic-imports `App` so a missing/rotated secret degrades to a fallback screen instead of a blank page (item 88).
-- **Master Blueprint v3.0**: P0–P3 DONE · **§3.6 Combat Foundation LOCKED** (PR #22) · **§3.6.11 combo + §3.7 หนุมาน kit LOCKED** (issue #33 homework) · **NEXT: P4** Enemy AI
+- **Master Blueprint v3.0**: P0–P3 DONE · §3.6–§3.7 LOCKED · **P4 blockers CLOSED** (#34 depthTolerance 95/100/105/88 · #36 Enemy AI Telegraph+ranges · #41 hitstun 200/i-frames · #42 gauge-only) · **NEXT: P4 implement**
 - **Battle (CURRENT)**: realtime · 2.5D side-down · L/R + lunge · 3 skills + ultimate (P3) · no global soft-target; **Ult skill-only lock** (หนุมาน)
-- **Still open**: per-hero finisher numbers · fork gap issues [#34–#44](https://github.com/nustanakritwithai/GameTurnBase/issues/34) (ไม่บล็อก P4)
+- **Still open**: per-hero finisher numbers · fork gaps [#35/#37–#40/#43–#44](https://github.com/nustanakritwithai/GameTurnBase/issues) (ไม่บล็อก P4)
 
 - **Blueprint gap closure — full 8-track sweep DONE (2026-08-07)**: HetCreep's rule — verify each blueprint PART against actually-shipped code (not just trust the gap analysis's own claims), classify per `master-blueprint-law.md` (a docs/governance pass does NOT implement combat/dungeon/hero/loot/gacha/progression/AI/boss/town/quest), file every real conflict as an issue on `nustanakritwithai/GameTurnBase` (explicitly NOT this repo — this repo stays docs-only for this sweep). Solo, no ultracode workflow (declined). Sequencing was the agent's call: docs debt (lowest risk, pilot) → business model → skills/soft-target → state-machine/boss → equipment/loot → currency-sinks/gacha → dungeon structure → camera (biggest, last, matches the gap analysis's own "don't rush it" note — every other track can be built against the CURRENT camera without waiting on this one).
   - **Track 1 (docs debt), fixed in this repo directly**: `README.md`'s two stale claims — "ยังไม่มีระบบดรอปจริง" was false (RewardSystem/`earnGold('drop',...)` live since PR #14), "ฉากเดิน/สำรวจ" was listed as current scope when it's LEGACY since PR #11. LEGACY classification itself (item 80) was already correct on inspection.
