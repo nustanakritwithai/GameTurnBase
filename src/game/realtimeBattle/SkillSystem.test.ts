@@ -159,6 +159,155 @@ describe('SkillSystem', () => {
 
     expect(isCastingSkill(skill)).toBe(false)
   })
+
+  it('Done-criterion 1: canStartSkill returns false when player is dead, stunned, already casting, or basic attacking', () => {
+    const kit = getRealtimeSkillKit('monkey-king')
+    if (!kit) throw new Error('ไม่พบ kit หงอคง')
+    const skill1Def = getSkillFromKit(kit, 'skill1')
+
+    // 1. Player is dead
+    const deadPlayer = player({ state: 'dead' })
+    let skillState = createSkillState()
+    expect(canStartSkill(deadPlayer, skillState, skill1Def, false)).toBe(false)
+
+    // 2. Player is stunned (control locked)
+    const stunnedPlayer = player({ hitStunRemainingMs: 150 })
+    skillState = createSkillState()
+    expect(canStartSkill(stunnedPlayer, skillState, skill1Def, false)).toBe(false)
+
+    // 3. Player is basic attacking
+    const normalPlayer = player()
+    skillState = createSkillState()
+    expect(canStartSkill(normalPlayer, skillState, skill1Def, true)).toBe(false) // isAttacking = true
+
+    // 4. Isolated already casting check
+    skillState = createSkillState()
+    startSkill(normalPlayer, skillState, skill1Def, 0)
+    // We try to start a DIFFERENT skill or same skill while skillState.definition is not null
+    expect(canStartSkill(normalPlayer, skillState, skill1Def, false)).toBe(false)
+  })
+
+  it('Done-criterion 4: interruptible: false skill survives hitstun during startup/active phases but gets interrupted in recovery phase if overridden', () => {
+    const kit = getRealtimeSkillKit('monkey-king')
+    if (!kit) throw new Error('ไม่พบ kit หงอคง')
+    const ultimate = getSkillFromKit(kit, 'ultimate') // MONKEY_GOLDEN_FURY has startup/active interruptible: false, recovery interruptible: true
+
+    const unit = player({ ultimateGauge: ULTIMATE_GAUGE_CONFIG.max })
+    const skill = createSkillState()
+
+    startSkill(unit, skill, ultimate, 0)
+    expect(isCastingSkill(skill)).toBe(true)
+
+    // 1. During startup phase (at 100ms, startupMs is 220)
+    stepSkill(unit, skill, 100) // elapsed = 100ms
+    unit.hitStunRemainingMs = 120
+    stepSkill(unit, skill, 0) // run step with hitstun
+    // Should NOT cancel because startup phase is non-interruptible
+    expect(isCastingSkill(skill)).toBe(true)
+
+    // Clear hitstun for step progression
+    unit.hitStunRemainingMs = 0
+
+    // 2. During active phase (advance by 200ms -> total elapsed = 300ms, which is > 220 and < 220+520)
+    stepSkill(unit, skill, 200)
+    unit.hitStunRemainingMs = 120
+    stepSkill(unit, skill, 0)
+    // Should NOT cancel because active phase is non-interruptible
+    expect(isCastingSkill(skill)).toBe(true)
+
+    // Clear hitstun
+    unit.hitStunRemainingMs = 0
+
+    // 3. During recovery phase (advance by 500ms -> total elapsed = 800ms, which is > 220+520)
+    stepSkill(unit, skill, 500)
+    unit.hitStunRemainingMs = 120
+    stepSkill(unit, skill, 0)
+    // Should cancel because recovery phase override has interruptible: true
+    expect(isCastingSkill(skill)).toBe(false)
+  })
+
+  it('Done-criterion 5: can start and step a skill from a dynamically registered custom hero kit without modifying SkillSystem.ts', () => {
+    const customAttack = {
+      id: 'custom-attack',
+      animationId: 'attack-1' as const,
+      startupMs: 100,
+      activeMs: 100,
+      recoveryMs: 100,
+      comboWindowStartMs: 0,
+      comboWindowEndMs: 0,
+      damageMultiplier: 1.0,
+      range: 100,
+      hitShape: 'horizontal' as const,
+      arcDegrees: 0,
+      depthTolerance: 10,
+      knockback: 10,
+    }
+    const customKit = {
+      skill1: {
+        id: 'custom-skill-1',
+        name: 'สกิลพิเศษ',
+        slot: 'skill1' as const,
+        characterId: 'custom-hero',
+        attack: customAttack,
+        cooldownMs: 1000,
+        invulnerableMs: 50,
+      },
+      skill2: {
+        id: 'custom-skill-2',
+        name: 'สกิลพิเศษ 2',
+        slot: 'skill2' as const,
+        characterId: 'custom-hero',
+        attack: customAttack,
+        cooldownMs: 2000,
+        invulnerableMs: 50,
+      },
+      skill3: {
+        id: 'custom-skill-3',
+        name: 'สกิลพิเศษ 3',
+        slot: 'skill3' as const,
+        characterId: 'custom-hero',
+        attack: customAttack,
+        cooldownMs: 3000,
+        invulnerableMs: 50,
+      },
+      ultimate: {
+        id: 'custom-ultimate',
+        name: 'อัลติพิเศษ',
+        slot: 'ultimate' as const,
+        characterId: 'custom-hero',
+        attack: customAttack,
+        cooldownMs: 0,
+        invulnerableMs: 200,
+      },
+    }
+
+    const unit = player()
+    const skillState = createSkillState()
+    expect(canStartSkill(unit, skillState, customKit.skill1, false)).toBe(true)
+    startSkill(unit, skillState, customKit.skill1, 0)
+    expect(skillState.definition?.id).toBe('custom-skill-1')
+  })
+
+  it('Scar: casting a skill on player A does not mutate player B or its skill/cooldown state', () => {
+    const kit = getRealtimeSkillKit('monkey-king')
+    if (!kit) throw new Error('ไม่พบ kit หงอคง')
+    const skill1Def = getSkillFromKit(kit, 'skill1')
+
+    const playerA = player({ id: 'player-a' })
+    const playerB = player({ id: 'player-b' })
+    const skillStateA = createSkillState()
+    const skillStateB = createSkillState()
+
+    startSkill(playerA, skillStateA, skill1Def, 0)
+
+    expect(playerA.state).toBe('skill')
+    expect(playerA.skillCooldownsMs.skill1).toBe(SKILL_CONFIG.skill1CooldownMs)
+
+    // Player B must remain unaffected
+    expect(playerB.state).toBe('idle')
+    expect(playerB.skillCooldownsMs.skill1).toBe(0)
+    expect(isCastingSkill(skillStateB)).toBe(false)
+  })
 })
 
 describe('targetLock: nearest (ระบบ #8 Skill-Targeting System)', () => {

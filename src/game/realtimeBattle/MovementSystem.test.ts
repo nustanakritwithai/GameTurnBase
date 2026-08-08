@@ -180,4 +180,77 @@ describe('stepMovement', () => {
     const diagonalDistance = Math.hypot(diagonal.position.x - 500, diagonal.position.y - 500)
     expect(diagonalDistance).toBeCloseTo(straightDistance)
   })
+
+  it('Done-criterion 4: rejects movement input while hitStunRemainingMs > 0, and accepts it immediately when 0', () => {
+    const player = entity({ hitStunRemainingMs: 100, position: { x: 500, y: 500 } })
+
+    // Case 1: hitStunRemainingMs > 0 -> should reject movement
+    let moved = stepMovement(player, { x: 1, y: 0 }, 50, context())
+    expect(moved).toBe(false)
+    expect(player.position).toEqual({ x: 500, y: 500 })
+
+    // Case 2: hitStunRemainingMs becomes 0 -> should accept movement
+    player.hitStunRemainingMs = 0
+    moved = stepMovement(player, { x: 1, y: 0 }, 50, context())
+    expect(moved).toBe(true)
+    expect(player.position.x).toBeGreaterThan(500)
+  })
+
+  it('Scar 3: target knocked into wall/boundary can recover and move away normally', () => {
+    // Place target near the right boundary: width is 1000, collisionRadius is 30.
+    // Near boundary position: x = 970 (exactly touching).
+    const target = entity({
+      position: { x: 970, y: 500 },
+      hitStunRemainingMs: 100,
+    })
+
+    // Try to move left (away from boundary) while stunned -> should reject
+    let moved = stepMovement(target, { x: -1, y: 0 }, 50, context())
+    expect(moved).toBe(false)
+    expect(target.position.x).toBe(970)
+
+    // Stun expires
+    target.hitStunRemainingMs = 0
+
+    // Try to move left (away from boundary) -> should allow and succeed
+    moved = stepMovement(target, { x: -1, y: 0 }, 50, context())
+    expect(moved).toBe(true)
+    expect(target.position.x).toBeLessThan(970)
+  })
+
+  it('เดินเฉียงที่มุมต่างๆ ไม่เร็วกว่าความเร็วสูงสุด (Doom Diagonal Speed)', () => {
+    const angles = [0.1, 0.2, 0.4, 0.6, 0.8, 1.2, 1.5]
+    for (const angle of angles) {
+      const player = entity({ speed: 200 })
+      const input = { x: Math.cos(angle), y: Math.sin(angle) }
+      stepMovement(player, input, 1000, context())
+      const dist = Math.hypot(player.position.x - 500, player.position.y - 500)
+      expect(dist).toBeLessThanOrEqual(200.01)
+    }
+  })
+
+  it('ระบบฟิสิกส์ต้องไม่ทลวงชนทะลุสิ่งกีดขวางเมื่อเกิดแลกสไปก์ก้อนใหญ่ (Fix Your Timestep)', () => {
+    const player = entity({ position: { x: 500, y: 500 }, speed: 200, collisionRadius: 30 })
+    const blocker = entity({ id: 'blocker', position: { x: 550, y: 500 }, collisionRadius: 30 })
+
+    // ด้วยความเร็ว 200 และ deltaMs = 10000 (10 วินาที) ผู้เล่นพยายามเดินไปทางขวา 2000 พิกเซล
+    // แต่มี blocker บล็อกอยู่ที่ 550. ระยะห่างขั้นต่ำคือ 60 ดังนั้นผู้เล่นต้องหยุดที่ x = 490 และห้ามทะลุไปทางขวา
+    stepMovement(player, { x: 1, y: 0 }, 10000, { stage: stage(), blockers: [blocker] })
+
+    expect(player.position.x).toBeLessThanOrEqual(490.01)
+  })
+
+  it('การซ้อนทับกันของวัตถุหลายชิ้นต้องไม่ทำให้เกิดแรงผลักสะสมจนกระเด็น (Skyrim Physics)', () => {
+    const player = entity({ position: { x: 500, y: 500 }, collisionRadius: 30 })
+    const blockers = [
+      entity({ id: 'b1', position: { x: 500, y: 500 }, collisionRadius: 30 }),
+      entity({ id: 'b2', position: { x: 500, y: 500 }, collisionRadius: 30 }),
+      entity({ id: 'b3', position: { x: 500, y: 500 }, collisionRadius: 30 }),
+    ]
+
+    stepMovement(player, { x: 1, y: 0 }, 16.67, { stage: stage(), blockers })
+
+    const dist = Math.hypot(player.position.x - 500, player.position.y - 500)
+    expect(dist).toBeLessThanOrEqual(100)
+  })
 })

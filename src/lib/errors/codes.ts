@@ -41,6 +41,10 @@ export const ERROR_CODES = {
   // ทั้งที่ข้อมูลไม่ได้ลง (updatePlayer อัปเดต state ก่อนเขียนเสมอ) เงียบตรงนี้คือทำข้อมูลหาย
   PLAYER_SAVE_FAIL: 'บันทึกความคืบหน้าไม่สำเร็จ พื้นที่เก็บข้อมูลอาจเต็ม',
 
+  // รางวัลหลังต่อสู้ — ledger ล้มหลังบันทึก EXP แล้ว (progression อยู่ ทอง/ไอเทมยังไม่เข้า)
+  REWARD_GOLD_FAIL: 'บันทึกทองจากรางวัลไม่สำเร็จ ประสบการณ์ถูกบันทึกแล้ว',
+  REWARD_ITEM_FAIL: 'บันทึกไอเทมจากรางวัลไม่สำเร็จ ประสบการณ์ถูกบันทึกแล้ว',
+
   // สำรองข้อมูลออกเป็นไฟล์ไม่สำเร็จ — SILENT เพราะปุ่มที่กดแสดงข้อความบอกอยู่แล้ว
   SAVE_EXPORT_FAIL: 'สำรองข้อมูลเป็นไฟล์ไม่สำเร็จ',
 
@@ -90,10 +94,17 @@ export const ERROR_CODES = {
   BATTLE_ASSET_LOAD_FAIL: 'โหลดภาพตัวละครไม่สำเร็จ', // VISIBLE — โยน error ต่อจริง กระทบผู้เล่นเห็นชัด
   BATTLE_DEFERRED_ASSET_FAIL: 'โหลดเฟรมส่วนที่เหลือไม่ครบ', // SILENT — preload พื้นหลัง ไม่บล็อกการเล่น
   BATTLE_WEBGL_CONTEXT_LOST: 'การ์ดจอขาดการเชื่อมต่อระหว่างต่อสู้', // VISIBLE
+  BATTLE_REWARD_FAIL: 'บันทึกรางวัลหลังต่อสู้ไม่สำเร็จ',
 
   // src/main.tsx — โหลด App.tsx แบบ dynamic import ไม่สำเร็จ (เช่น env ของ Supabase หาย)
   // VISIBLE — เกิดก่อน React ขึ้นจอเลย ผู้เล่นเห็นแค่ innerHTML สำรองที่ main.tsx เขียนเอง
   APP_BOOTSTRAP_FAIL: 'โหลดแอปไม่สำเร็จ',
+
+  // ค้นหาผู้เล่นด้วย UID (เพิ่มเพื่อน) ล้มเหลวที่ชั้น RPC เอง — SILENT เพราะ AddFriendPanel
+  // แสดง "ไม่พบผู้เล่นรหัสนี้" ให้อยู่แล้วทั้งสองกรณี (หาไม่เจอจริง vs RPC error) มีรหัสไว้แยก
+  // สองกรณีนี้ออกจากกันในฝั่ง log เท่านั้น — ก่อนหน้านี้แยกไม่ออกเลย ซึ่งเป็นสาเหตุที่ทำให้ฟีเจอร์
+  // นี้พังเงียบ ๆ ในโปรดักชันมาก่อน (ดู .agents/rules/public-profile-lookup-law.md)
+  FRIEND_LOOKUP_FAIL: 'ค้นหาผู้เล่นด้วยรหัสไม่สำเร็จ',
 } as const
 
 export type ErrorCode = keyof typeof ERROR_CODES

@@ -56,9 +56,13 @@ By design, not bugs — don't file these:
   currency/characters/admin-status; any client-side tampering is cosmetic and gets overwritten
   on the next server round-trip. **Do** file a report if you find a way to make a _write_ (an
   RPC call, a direct table mutation) actually persist a value the server should have rejected —
-  that crosses a real trust boundary. (This project already fixed one real case of this shape:
+  that crosses a real trust boundary. (This project already fixed real cases of this shape:
   `grant_character` didn't check admin status before 2026-08-07 — see `supabase/migrations/0004_admin_accounts.sql`'s
-  own comment for what that looked like and how it was closed. Report the same _class_ of bug elsewhere.)
+  own comment for what that looked like and how it was closed. On 2026-08-08, `earn_gold`/`grant_item`
+  accepted unbounded client-supplied amounts and `profiles.gold`/`gem` had no column-write protection
+  beyond RLS (which is row-scoped, not column-scoped) — see `supabase/migrations/0009_economy_integrity_fixes.sql`.
+  Lobby battle rewards use refId-guarded RPCs and a durable pending snapshot table — see
+  `supabase/migrations/0013_reward_idempotency.sql`. Report the same _class_ of bug elsewhere.)
 - **"Passwords are hashed client-side with no real server auth."** No longer applies to the live
   app — auth is Supabase Auth (server-side), not the old local PBKDF2 layer in
   [`src/lib/password.ts`](src/lib/password.ts) (dormant, kept only as a shared validator source).

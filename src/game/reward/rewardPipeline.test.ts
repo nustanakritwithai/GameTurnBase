@@ -202,6 +202,42 @@ describe('resolveRewards', () => {
     )
   })
 
+  it('replay (isFirstClear false) ไม่แจก first-clear bonus — เฉพาะ guaranteed rewards', () => {
+    const first = resolveRewards(definition, {
+      dungeonId: 'p5-test-dungeon',
+      runId: 'run-first',
+      success: true,
+      stageResults: [],
+      isFirstClear: true,
+      failureRewardPolicy: 'none',
+      combatSummary: {
+        enemiesDefeated: 1,
+        elitesDefeated: 0,
+        bossesDefeated: 1,
+        damageDealt: 0,
+        damageTaken: 0,
+      },
+    })
+    const replay = resolveRewards(definition, {
+      dungeonId: 'p5-test-dungeon',
+      runId: 'run-replay',
+      success: true,
+      stageResults: [],
+      isFirstClear: false,
+      failureRewardPolicy: 'none',
+      combatSummary: {
+        enemiesDefeated: 1,
+        elitesDefeated: 0,
+        bossesDefeated: 1,
+        damageDealt: 0,
+        damageTaken: 0,
+      },
+    })
+    expect(first.entries.some((e) => e.type === 'item' && e.itemId === 'iron-essence')).toBe(true)
+    expect(replay.entries.some((e) => e.type === 'item' && e.itemId === 'iron-essence')).toBe(false)
+    expect(replay.entries.some((e) => e.type === 'currency')).toBe(true)
+  })
+
   it('returns empty rewards on failure with none policy', () => {
     const resolved = resolveRewards(definition, {
       dungeonId: 'p5-test-dungeon',

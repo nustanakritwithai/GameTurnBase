@@ -208,4 +208,93 @@ describe('findHitTargets — targetLock: nearest (ระบบ #8 Skill-Targetin
     )
     expect(hits).toEqual([])
   })
+
+  it('Scar 1: target invulnerability window prevents subsequent hits during elapsedMs', () => {
+    const target = entity({ id: 'target', position: { x: 50, y: 0 } })
+    const testAttacker = entity({
+      id: 'player',
+      entityType: 'player',
+      combatFacing: 'right',
+      position: { x: 0, y: 0 },
+    })
+
+    // Initial hit at 1000ms sets target's invulnerability until 1120ms
+    target.invulnerableUntilMs = 1120
+
+    // Query hitbox at 1100ms -> should filter target out
+    let hits = findHitTargets([target], query({ attacker: testAttacker, elapsedMs: 1100 }))
+    expect(hits).toHaveLength(0)
+
+    // Query hitbox at 1121ms -> should hit the target
+    hits = findHitTargets([target], query({ attacker: testAttacker, elapsedMs: 1121 }))
+    expect(hits.map((t) => t.id)).toEqual(['target'])
+  })
+
+  it('Scar 2: uses current combatFacing at resolution time (mid-animation crossing)', () => {
+    const target = entity({ id: 'target', position: { x: 100, y: 0 } })
+    const testAttacker = entity({
+      id: 'player',
+      entityType: 'player',
+      combatFacing: 'right',
+      facing: 'right',
+      position: { x: 0, y: 0 },
+    })
+
+    // At attack start, target is in front (x: 100, combatFacing: right) -> hits
+    let hits = findHitTargets([target], query({ attacker: testAttacker }))
+    expect(hits.map((t) => t.id)).toEqual(['target'])
+
+    // Target crosses behind attacker mid-animation (x: -100, combatFacing remains right) -> misses
+    target.position.x = -100
+    hits = findHitTargets([target], query({ attacker: testAttacker }))
+    expect(hits).toHaveLength(0)
+
+    // Attacker combatFacing updates/flips to left mid-animation -> hits again
+    testAttacker.combatFacing = 'left'
+    hits = findHitTargets([target], query({ attacker: testAttacker }))
+    expect(hits.map((t) => t.id)).toEqual(['target'])
+  })
+
+  it('Scar 3: depth Y-axis check is symmetric for positive and negative offsets', () => {
+    const testAttacker = entity({
+      id: 'player',
+      entityType: 'player',
+      combatFacing: 'right',
+      position: { x: 0, y: 0 },
+    })
+
+    const targetPositive = entity({ id: 'target-pos', position: { x: 50, y: 30 } })
+    const targetNegative = entity({ id: 'target-neg', position: { x: 50, y: -30 } })
+
+    const testAttack = {
+      ...PLAYER_ATTACK,
+      range: 100,
+      depthTolerance: 40,
+    }
+
+    // Depth gap is 30 - 36 (hurtboxRadius) = -6 (<= 40), so both should hit
+    let hits = findHitTargets(
+      [targetPositive, targetNegative],
+      query({ attacker: testAttacker, attack: testAttack }),
+    )
+    expect(hits.map((t) => t.id)).toContain('target-pos')
+    expect(hits.map((t) => t.id)).toContain('target-neg')
+
+    // If depth tolerance is smaller than depth gap:
+    const strictAttack = {
+      ...PLAYER_ATTACK,
+      range: 100,
+      depthTolerance: 10,
+    }
+    // target.hurtboxRadius is 36. dy is 60. depthGap = 60 - 36 = 24.
+    // 24 > 10, so both should miss symmetrically.
+    targetPositive.position.y = 60
+    targetNegative.position.y = -60
+
+    hits = findHitTargets(
+      [targetPositive, targetNegative],
+      query({ attacker: testAttacker, attack: strictAttack }),
+    )
+    expect(hits).toHaveLength(0)
+  })
 })

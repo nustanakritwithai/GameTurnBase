@@ -39,6 +39,10 @@ export default function App() {
     isAdmin,
     grantCharacter,
     grantItem,
+    commitLobbyBattleProgression,
+    upsertPendingLobbyReward,
+    clearPendingLobbyReward,
+    getPendingLobbyRewards,
     exportSave,
   } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
@@ -54,6 +58,10 @@ export default function App() {
             onPlayerChange={updatePlayer}
             onEarnGold={earnGold}
             onGrantItem={grantItem}
+            onCommitProgression={commitLobbyBattleProgression}
+            onRecordPending={upsertPendingLobbyReward}
+            onClearPending={clearPendingLobbyReward}
+            onGetPendingRewards={getPendingLobbyRewards}
             onLogout={logout}
             onTopUpGold={topUpGold}
             onTopUpGems={topUpGems}

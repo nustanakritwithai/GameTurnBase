@@ -61,6 +61,32 @@ describe('calculateBattleReward', () => {
       { itemId: 'spirit-incense', quantity: 1 },
     ])
   })
+
+  test('Done-criterion 3: calculateBattleReward does not mutate its state argument', () => {
+    const state = createRealtimeBattle('trial-01', stubPlayer())
+    if (!state) throw new Error('expected battle state')
+    state.defeatedEnemyIds = state.enemies.map((e) => e.id)
+    state.currentWaveIndex = 1
+
+    const stateClone = JSON.parse(JSON.stringify(state))
+    calculateBattleReward(state, 'victory')
+    expect(state).toEqual(stateClone)
+  })
+
+  test('Done-criterion 5: droppedItems ids only contain approved materials/consumables and no equipment/affixes', () => {
+    const state = createRealtimeBattle('trial-01', stubPlayer())
+    if (!state) throw new Error('expected battle state')
+    state.defeatedEnemyIds = state.enemies.map((e) => e.id)
+    state.currentWaveIndex = 2
+
+    const reward = calculateBattleReward(state, 'victory')
+    const approvedIds = new Set(['iron-essence', 'spirit-incense', 'healing-peach'])
+
+    expect(reward.droppedItems.length).toBeGreaterThan(0)
+    for (const item of reward.droppedItems) {
+      expect(approvedIds.has(item.itemId)).toBe(true)
+    }
+  })
 })
 
 describe('applyBattleExp', () => {
@@ -75,5 +101,17 @@ describe('applyBattleExp', () => {
   test('zero exp is a no-op', () => {
     const player = stubPlayer()
     expect(applyBattleExp(player, 0)).toBe(player)
+  })
+
+  test('Done-criterion 4: applyBattleExp does not write or mutate currency or inventory fields', () => {
+    const originalPlayer = stubPlayer()
+    const currencyClone = { ...originalPlayer.currency }
+    const inventoryClone = [...originalPlayer.inventory]
+
+    const nextPlayer = applyBattleExp(originalPlayer, 250)
+
+    expect(nextPlayer.currency).toEqual(currencyClone)
+    expect(nextPlayer.inventory).toEqual(inventoryClone)
+    expect(nextPlayer.level).toBeGreaterThan(originalPlayer.level)
   })
 })

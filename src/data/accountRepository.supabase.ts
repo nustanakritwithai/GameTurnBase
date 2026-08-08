@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabaseClient'
+import { reportError } from '../lib/errors/reportError'
 import { generateUid } from '../game/uid'
 import { TEAM_SIZE } from '../game/team'
 import { migrateOwnedCharacters } from '../game/progression/progressionMigration'
 import { mapOwnedCharacterRow } from './accountRepository.supabase.mapping'
+import type { RealtimeBattleResult } from '../game/realtimeBattle/types'
 import { EMPTY_PROGRESS, type FriendCandidate, type Player } from '../types/player'
 import {
   GEM_PACKAGES,
@@ -319,14 +321,24 @@ export function getSessionEmail(): string | null {
   return cachedSessionEmail
 }
 
+/**
+ * ค้นหาผู้เล่นอื่นจาก UID (เพิ่มเพื่อน) — ผ่าน RPC `find_player_by_uid`
+ * (supabase/migrations/0012_public_profile_lookup.sql) ไม่ query ตาราง profiles ตรง ๆ เพราะ
+ * SELECT RLS policy เดียวของตารางนั้นคือ auth.uid() = id (แถวตัวเองเท่านั้น) — query ตรงหา
+ * UID คนอื่นได้ 0 แถวเสมอ (เคย broken แบบเงียบ ๆ มาก่อน ดู .agents/rules/public-profile-lookup-law.md)
+ */
 export async function findPlayerByUid(uid: string): Promise<FriendCandidate | null> {
-  const { data } = await supabase
-    .from('profiles')
-    .select('uid,name,level,title')
-    .eq('uid', uid)
-    .maybeSingle()
-  if (!data) return null
-  return { uid: data.uid, name: data.name, level: data.level, title: data.title }
+  // returns table(...) มาเป็น array เสมอผ่าน PostgREST (ไม่ใช่ object เดี่ยว) — ไม่ chain
+  // .maybeSingle() เพราะ type ของ supabase-js แคบผิดตอนไม่มี generated Database type ให้ client
+  const { data, error } = await supabase.rpc('find_player_by_uid', { p_uid: uid })
+  // เช็ค error แยกจาก "หาไม่เจอจริง" ไว้เสมอ — เดิมไม่เช็คเลย ทำให้ RPC พัง/สิทธิ์ไม่ครบ
+  // ดูเหมือน "ไม่พบผู้เล่น" เฉย ๆ บนหน้าจอ ซึ่งเป็นสาเหตุเดิมที่ฟีเจอร์นี้พังเงียบ ๆ มาก่อน
+  // (ดู .agents/rules/public-profile-lookup-law.md) — SILENT เพราะ UI แสดงข้อความเดียวกัน
+  // ทั้งสองกรณีอยู่แล้ว รหัสมีไว้แยกสาเหตุฝั่ง log เท่านั้น
+  if (error) reportError('FRIEND_LOOKUP_FAIL', 'silent', error)
+  const row = (data as FriendCandidate[] | null)?.[0]
+  if (!row) return null
+  return { uid: row.uid, name: row.name, level: row.level, title: row.title }
 }
 
 export async function savePlayer(player: Player): Promise<boolean> {
@@ -407,6 +419,19 @@ export async function topUpGems(_uid: string, _packageId: string): Promise<Curre
   return { ok: false, error: 'ระบบเติมเงินยังไม่เปิดให้ใช้งาน' }
 }
 
+/**
+ * ⚠️ `uid` ต้องเป็นของบัญชีที่ login อยู่ตอนนี้เท่านั้น — ห้ามใช้เรียกดูของบัญชีอื่นเด็ดขาด
+ *
+ * ตาราง profiles มี SELECT RLS policy เดียวคือ auth.uid() = id (แถวตัวเองเท่านั้น) ถ้าเรียกด้วย
+ * uid ของคนอื่น query ด้านล่างได้ 0 แถวเงียบ ๆ — คืน [] เหมือน "ไม่มีธุรกรรมเลย" ทุกประการ
+ * แยกไม่ออกจากกรณีจริง เป็น landmine คลาสเดียวกับที่ findPlayerByUid เคยพังเงียบ ๆ ในโปรดักชันมา
+ * ก่อนแก้ผ่าน RPC เฉพาะ (ดู .agents/rules/public-profile-lookup-law.md +
+ * supabase/migrations/0012_public_profile_lookup.sql) — ต่างกันตรงที่ฟังก์ชันนี้**ยังไม่ได้ผูก
+ * เข้ากับ useAuth.ts หรือหน้าจอไหนเลย** (grep ยืนยันแล้ว, 2026-08-08) จึงยังไม่เคยถูกเรียกด้วย uid
+ * ที่ไม่ใช่ของตัวเองจริง ๆ — สัญญาณเตือนนี้มีไว้ให้คนที่จะผูกใช้งานจริงในอนาคตเห็นก่อนพลาดซ้ำ
+ * ไม่ใช้ auth.uid() ตรง ๆ แทน param `uid` เพราะฟังก์ชันนี้ต้อง shape parity กับ accountRepository.ts
+ * (localStorage backend, keyed ด้วย uid ไม่ใช่ session) ดู work contract #14 done-criterion #1
+ */
 export async function getTransactions(uid: string): Promise<CurrencyTransaction[]> {
   const { data: profile } = await supabase
     .from('profiles')
@@ -429,16 +454,132 @@ export async function getTransactions(uid: string): Promise<CurrencyTransaction[
   }))
 }
 
+export interface PendingLobbyRewardRow {
+  transactionId: string
+  stageId: string
+  stageName: string
+  outcome: 'victory' | 'defeat'
+  earnedExp: number
+  earnedGold: number
+  droppedItems: Array<{ itemId: string; quantity: number }>
+  finishedAt: string
+  durationMs?: number | null
+}
+
+export interface LobbyBattleProgressionRpcPayload {
+  transactionId: string
+  player: Player
+  leadCharacterId: string
+  battle: {
+    externalId: string
+    opponent: string
+    result: 'win' | 'lose'
+    durationMs: number
+    finishedAt: string
+  }
+}
+
+export async function commitLobbyBattleProgression(
+  payload: LobbyBattleProgressionRpcPayload,
+): Promise<{ ok: true; player: Player } | { ok: false; error: string }> {
+  const lead = payload.player.ownedCharacters.find(
+    (owned) => owned.characterId === payload.leadCharacterId,
+  )
+  if (!lead) {
+    return { ok: false, error: 'ไม่พบตัวละครขุนพลสำหรับบันทึกความคืบหน้า' }
+  }
+
+  const { data, error } = await supabase.rpc('commit_lobby_battle_progression', {
+    p_transaction_id: payload.transactionId,
+    p_name: payload.player.name,
+    p_title: payload.player.title,
+    p_profile_level: payload.player.level,
+    p_profile_exp: payload.player.exp,
+    p_profile_exp_to_next: payload.player.expToNext,
+    p_frame_id: payload.player.frameId,
+    p_flags: payload.player.progress.flags,
+    p_defeated_npc_ids: payload.player.progress.defeatedNpcIds,
+    p_lead_character_id: payload.leadCharacterId,
+    p_hero_level: lead.level,
+    p_hero_exp: lead.exp,
+    p_hero_exp_to_next: lead.expToNext,
+    p_skill_levels: lead.skillLevels,
+    p_talent_state: lead.talentState ?? { unlockedNodes: [] },
+    p_awakening_state: lead.awakeningState ?? { tier: 0, unlockedEffects: [] },
+    p_battle_external_id: payload.battle.externalId,
+    p_opponent: payload.battle.opponent,
+    p_battle_result: payload.battle.result,
+    p_duration_ms: payload.battle.durationMs,
+    p_finished_at: payload.battle.finishedAt,
+  })
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'บันทึกความคืบหน้าไม่สำเร็จ' }
+  }
+
+  const player = await loadPlayer(data.id)
+  if (!player) return { ok: false, error: 'บันทึกความคืบหน้าไม่สำเร็จ' }
+  return { ok: true, player }
+}
+
+export async function upsertPendingLobbyReward(
+  result: RealtimeBattleResult,
+  transactionId: string,
+): Promise<boolean> {
+  const { error } = await supabase.rpc('upsert_pending_lobby_reward', {
+    p_transaction_id: transactionId,
+    p_stage_id: result.stageId,
+    p_stage_name: result.stageName,
+    p_outcome: result.outcome,
+    p_earned_exp: result.earnedExp,
+    p_earned_gold: result.earnedGold,
+    p_dropped_items: result.droppedItems,
+    p_finished_at: result.finishedAt,
+    p_duration_ms: result.elapsedMs,
+  })
+  return !error
+}
+
+export async function clearPendingLobbyReward(transactionId: string): Promise<void> {
+  await supabase.rpc('clear_pending_lobby_reward', { p_transaction_id: transactionId })
+}
+
+export async function getPendingLobbyRewards(): Promise<PendingLobbyRewardRow[]> {
+  const { data: session } = await supabase.auth.getSession()
+  const userId = session.session?.user.id
+  if (!userId) return []
+
+  const { data } = await supabase
+    .from('pending_lobby_rewards')
+    .select('*')
+    .eq('profile_id', userId)
+    .order('created_at')
+
+  return (data ?? []).map((row) => ({
+    transactionId: row.transaction_id,
+    stageId: row.stage_id,
+    stageName: row.stage_name,
+    outcome: row.outcome as 'victory' | 'defeat',
+    earnedExp: row.earned_exp,
+    earnedGold: row.earned_gold,
+    droppedItems: (row.dropped_items ?? []) as Array<{ itemId: string; quantity: number }>,
+    finishedAt: row.finished_at,
+    durationMs: row.duration_ms,
+  }))
+}
+
 export async function grantItem(
   _uid: string,
   itemId: string,
   quantity: number,
   source: ItemSource,
+  refId?: string,
 ): Promise<ItemResult> {
   const { data, error } = await supabase.rpc('grant_item', {
     p_item_id: itemId,
     p_quantity: quantity,
     p_source: source,
+    p_ref_id: refId ?? null,
   })
   if (error || !data) return { ok: false, error: error?.message ?? 'บันทึกข้อมูลไม่สำเร็จ' }
   const player = await loadPlayer(data.id)

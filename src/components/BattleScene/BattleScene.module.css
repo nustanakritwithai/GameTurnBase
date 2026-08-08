@@ -264,10 +264,10 @@
 .stageObjectiveHud {
   position: absolute;
   left: max(var(--sp-2), env(safe-area-inset-left, 0px));
-  bottom: calc(var(--combat-cluster-height, 9rem) + var(--sp-3));
+  top: clamp(76px, 18vh, 120px);
   z-index: 4;
-  width: min(21vw, 11.5rem);
-  max-width: 22%;
+  width: clamp(9rem, 18vw, 11rem);
+  max-width: 20%;
   padding: calc(var(--sp-2) * 0.72) calc(var(--sp-2) * 0.85);
   border-radius: calc(var(--r-md) * 0.82);
   background: rgb(6 7 13 / 78%);
@@ -367,12 +367,27 @@
   pointer-events: none;
 }
 
-/* Combat cluster — ATK bottom-right anchor, skills arc up-left */
+/* Combat cluster — Blueprint §3.3: S1/S2/S3/ULT row above ATK. */
 .combatCluster {
-  position: relative;
-  width: calc(var(--combat-attack-size, 92px) * 2.35);
-  height: calc(var(--combat-attack-size, 92px) * 2.15);
+  width: var(--combat-cluster-width, 254px);
+  min-height: var(--combat-cluster-height, 162px);
+  display: grid;
+  align-content: end;
+  justify-items: end;
+  gap: var(--combat-cluster-gap, 14px);
   pointer-events: none;
+}
+
+.combatSkillsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--combat-cluster-gap, 14px);
+}
+
+.combatAttackRow {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .combatClusterBlocked {
@@ -381,7 +396,7 @@
 
 .combatBtn {
   pointer-events: auto;
-  position: absolute;
+  position: relative;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -400,8 +415,8 @@
     box-shadow 120ms var(--ease-out),
     border-color 120ms var(--ease-out);
   overflow: hidden;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .combatBtnPressed {
@@ -409,51 +424,26 @@
 }
 
 .combatBtnAttack {
-  width: max(44px, var(--combat-attack-size, 84px));
-  height: max(44px, var(--combat-attack-size, 84px));
+  width: max(48px, var(--combat-attack-size, 84px));
+  height: max(48px, var(--combat-attack-size, 84px));
   border-color: var(--c-ember);
   background: radial-gradient(circle at 50% 35%, rgb(255 140 90 / 55%), rgb(120 34 20 / 88%));
   font-size: clamp(0.85rem, 2.2vw, 1rem);
 }
 
 .combatBtnSkill {
-  width: max(44px, var(--combat-skill-size, 60px));
-  height: max(44px, var(--combat-skill-size, 60px));
+  width: max(48px, var(--combat-skill-size, 60px));
+  height: max(48px, var(--combat-skill-size, 60px));
   border-color: var(--c-gold);
   font-size: clamp(0.7rem, 1.8vw, 0.85rem);
 }
 
 .combatBtnUltimate {
-  width: max(44px, var(--combat-ultimate-size, 64px));
-  height: max(44px, var(--combat-ultimate-size, 64px));
+  width: max(48px, var(--combat-ultimate-size, 64px));
+  height: max(48px, var(--combat-ultimate-size, 64px));
   border-color: #e8a84a;
   background: radial-gradient(circle at 50% 35%, rgb(255 180 80 / 55%), rgb(100 40 8 / 90%));
   font-size: clamp(0.72rem, 1.9vw, 0.88rem);
-}
-
-.combatSlotAttack {
-  right: var(--combat-polar-attack-right, 0px);
-  bottom: var(--combat-polar-attack-bottom, 0px);
-}
-
-.combatSlotS1 {
-  right: var(--combat-polar-skill1-right, 0px);
-  bottom: var(--combat-polar-skill1-bottom, 0px);
-}
-
-.combatSlotS2 {
-  right: var(--combat-polar-skill2-right, 0px);
-  bottom: var(--combat-polar-skill2-bottom, 0px);
-}
-
-.combatSlotS3 {
-  right: var(--combat-polar-skill3-right, 0px);
-  bottom: var(--combat-polar-skill3-bottom, 0px);
-}
-
-.combatSlotUltimate {
-  right: var(--combat-polar-ultimate-right, 0px);
-  bottom: var(--combat-polar-ultimate-bottom, 0px);
 }
 
 .combatBtnReady {
@@ -522,13 +512,6 @@
 .combatBtnLabel {
   position: relative;
   z-index: 1;
-}
-
-@media (max-height: 480px) {
-  .combatCluster {
-    width: calc(var(--combat-attack-size, 92px) * 2.5);
-    height: calc(var(--combat-attack-size, 92px) * 2.25);
-  }
 }
 
 /* ── Viewport overlays (portrait guard + fullscreen prompt) ── */
