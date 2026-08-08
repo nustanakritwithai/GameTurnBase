@@ -26,6 +26,11 @@ import type {
   GoldSource,
   ItemResult,
 } from '../data/accountRepository.shared'
+import type {
+  LobbyBattleProgressionRpcPayload,
+  PendingLobbyRewardRow,
+} from '../data/accountRepository.supabase'
+import type { RealtimeBattleResult } from '../game/realtimeBattle/types'
 import type { FriendCandidate, Player } from '../types/player'
 import styles from './LobbyPage.module.css'
 
@@ -43,7 +48,18 @@ interface LobbyPageProps {
   /** ทองจากการเล่น (ดรอป/เควส) — ผ่าน ledger */
   onEarnGold: (source: GoldSource, amount: number, refId?: string) => Promise<CurrencyResult>
   /** ไอเทมดรอปจากการต่อสู้ */
-  onGrantItem: (itemId: string, quantity: number, source: GoldSource) => Promise<ItemResult>
+  onGrantItem: (
+    itemId: string,
+    quantity: number,
+    source: GoldSource,
+    refId?: string,
+  ) => Promise<ItemResult>
+  onCommitProgression: (
+    payload: LobbyBattleProgressionRpcPayload,
+  ) => Promise<{ ok: true; player: Player } | { ok: false; error: string }>
+  onRecordPending: (result: RealtimeBattleResult, transactionId: string) => Promise<boolean>
+  onClearPending: (transactionId: string) => Promise<void>
+  onGetPendingRewards: () => Promise<PendingLobbyRewardRow[]>
   onLogout: () => Promise<void>
   /** เติมทองด้วยเงินจริง */
   onTopUpGold: (packageId: string) => Promise<CurrencyResult>
@@ -72,6 +88,10 @@ export function LobbyPage({
   onPlayerChange,
   onEarnGold,
   onGrantItem,
+  onCommitProgression,
+  onRecordPending,
+  onClearPending,
+  onGetPendingRewards,
   onLogout,
   onTopUpGold,
   onTopUpGems,
@@ -218,6 +238,10 @@ export function LobbyPage({
           onPlayerChange={onPlayerChange}
           onEarnGold={onEarnGold}
           onGrantItem={onGrantItem}
+          onCommitProgression={onCommitProgression}
+          onRecordPending={onRecordPending}
+          onClearPending={onClearPending}
+          onGetPendingRewards={onGetPendingRewards}
           onExit={() => setBattleOpen(false)}
         />
       ) : null}

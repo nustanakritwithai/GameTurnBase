@@ -111,10 +111,20 @@ export interface BattleRecord {
   durationMs?: number
 }
 
+/** §5.1 energy/stamina skeleton — client-side until server authority matures (#25) */
+export interface PlayerEnergy {
+  current: number
+  max: number
+  /** ISO timestamp of last regen tick */
+  lastRegenAt: string
+}
+
 export interface PlayerProgress {
   flags: Record<string, boolean>
   defeatedNpcIds: string[]
   battleHistory: BattleRecord[]
+  /** Omitted on legacy saves — normalize via adventure/energySystem.ts */
+  energy?: PlayerEnergy
 }
 
 export const EMPTY_PROGRESS: PlayerProgress = {

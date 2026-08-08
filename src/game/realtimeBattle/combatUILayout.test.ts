@@ -1,77 +1,54 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   COMBAT_BUTTON_SIZES,
-  COMBAT_CLUSTER_POLAR,
   DEFAULT_COMBAT_UI_LAYOUT,
   MIN_BUTTON_GAP_PX,
-  buttonPolarPosition,
-  clusterButtonsCollide,
   layoutCssVars,
-  resolveClusterOffsets,
-  type CombatClusterSlot,
+  resolveCombatClusterMetrics,
 } from './combatUILayout'
 
-function polarDistance(offset: { right: number; bottom: number }): number {
-  return Math.hypot(offset.right, offset.bottom)
-}
+describe('combatUILayout Blueprint §3.3 row cluster', () => {
+  it('uses rendered touch-target sizes in the layout geometry', () => {
+    const metrics = resolveCombatClusterMetrics()
 
-function pairCollides(
-  offsets: Record<CombatClusterSlot, { right: number; bottom: number }>,
-  sizes: Record<CombatClusterSlot, number>,
-  a: CombatClusterSlot,
-  b: CombatClusterSlot,
-  minGap = MIN_BUTTON_GAP_PX,
-): boolean {
-  return clusterButtonsCollide(
-    { [a]: offsets[a], [b]: offsets[b] } as Record<
-      CombatClusterSlot,
-      { right: number; bottom: number }
-    >,
-    { [a]: sizes[a], [b]: sizes[b] } as Record<CombatClusterSlot, number>,
-    minGap,
-  )
-}
-
-describe('combatUILayout polar cluster', () => {
-  it('ULT uses a larger radius than S3', () => {
-    const ult = COMBAT_CLUSTER_POLAR.find((slot) => slot.slot === 'ultimate')
-    const s3 = COMBAT_CLUSTER_POLAR.find((slot) => slot.slot === 'skill3')
-    expect(ult?.radiusMul).toBeGreaterThan(s3?.radiusMul ?? 0)
+    expect(metrics.attackSize).toBeGreaterThan(metrics.skillSize)
+    expect(metrics.skillSize).toBeGreaterThanOrEqual(COMBAT_BUTTON_SIZES.minTouchTarget)
+    expect(metrics.ultimateSize).toBeGreaterThanOrEqual(COMBAT_BUTTON_SIZES.minTouchTarget)
+    expect(metrics.gap).toBeGreaterThanOrEqual(MIN_BUTTON_GAP_PX)
   })
 
-  it('ULT sits farther from ATK than S3 (Euclidean distance)', () => {
-    const attackSize = COMBAT_BUTTON_SIZES.attack
-    const gap = attackSize * DEFAULT_COMBAT_UI_LAYOUT.clusterGapRatio
-    const offsets = resolveClusterOffsets(attackSize, gap)
-    expect(polarDistance(offsets.ultimate)).toBeGreaterThan(polarDistance(offsets.skill3))
-    expect(offsets.ultimate.bottom).toBeGreaterThan(offsets.skill3.bottom)
+  it('fits exactly four skill buttons in one row above Attack', () => {
+    const metrics = resolveCombatClusterMetrics()
+    const expectedWidth = metrics.skillSize * 3 + metrics.ultimateSize + metrics.gap * 3
+    const expectedHeight =
+      Math.max(metrics.skillSize, metrics.ultimateSize) + metrics.gap + metrics.attackSize
+
+    expect(metrics.width).toBeCloseTo(expectedWidth, 8)
+    expect(metrics.height).toBeCloseTo(expectedHeight, 8)
   })
 
-  it('default layout keeps ULT separated from S3 and ATK', () => {
-    const attackSize = COMBAT_BUTTON_SIZES.attack * DEFAULT_COMBAT_UI_LAYOUT.attackScale
-    const gap = attackSize * DEFAULT_COMBAT_UI_LAYOUT.clusterGapRatio
-    const offsets = resolveClusterOffsets(attackSize, gap)
-    const sizes = {
-      attack: attackSize,
-      skill1: COMBAT_BUTTON_SIZES.skill * DEFAULT_COMBAT_UI_LAYOUT.skillScale,
-      skill2: COMBAT_BUTTON_SIZES.skill * DEFAULT_COMBAT_UI_LAYOUT.skillScale,
-      skill3: COMBAT_BUTTON_SIZES.skill * DEFAULT_COMBAT_UI_LAYOUT.skillScale,
-      ultimate: COMBAT_BUTTON_SIZES.ultimate * DEFAULT_COMBAT_UI_LAYOUT.ultimateScale,
-    }
-
-    expect(pairCollides(offsets, sizes, 'ultimate', 'skill3')).toBe(false)
-    expect(pairCollides(offsets, sizes, 'ultimate', 'attack')).toBe(false)
-  })
-
-  it('layoutCssVars emits polar offsets for every slot', () => {
+  it('emits row geometry and no legacy polar offsets', () => {
     const vars = layoutCssVars()
-    for (const slot of COMBAT_CLUSTER_POLAR) {
-      expect(vars[`--combat-polar-${slot.slot}-right`]).toMatch(/px$/)
-      expect(vars[`--combat-polar-${slot.slot}-bottom`]).toMatch(/px$/)
-    }
+
+    expect(vars['--combat-cluster-width']).toMatch(/px$/)
+    expect(vars['--combat-cluster-height']).toMatch(/px$/)
+    expect(vars['--combat-cluster-gap']).toMatch(/px$/)
+    expect(Object.keys(vars).some((key) => key.includes('polar'))).toBe(false)
   })
 
-  it('buttonPolarPosition returns anchor at zero radius', () => {
-    expect(buttonPolarPosition(92, 32, 0)).toEqual({ right: 0, bottom: 0 })
+  it('keeps the rendered stylesheet on row layout instead of polar positioning', () => {
+    const cssPath = resolve(process.cwd(), 'src/components/BattleScene/BattleScene.module.css')
+    const css = readFileSync(cssPath, 'utf8')
+
+    expect(css).toContain('.combatSkillsRow')
+    expect(css).toContain('.combatAttackRow')
+    expect(css).not.toContain('--combat-polar-')
+    expect(css).not.toContain('.combatSlotS1')
+  })
+
+  it('keeps the joystick clear of the bottom edge on short landscape screens', () => {
+    expect(DEFAULT_COMBAT_UI_LAYOUT.joystickAnchorYPercent).toBeLessThanOrEqual(76)
   })
 })

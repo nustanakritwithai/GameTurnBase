@@ -68,7 +68,22 @@ export interface AuthState {
   /** มอบตัวละครให้บัญชีนี้ — ตอนนี้เรียกจากช่องคำสั่งผู้ดูแลเท่านั้น */
   grantCharacter: (characterId: string) => Promise<CharacterGrantResult>
   /** ให้ไอเทมจากการเล่น (ดรอป/เควส) — ดู accountRepository.grantItem */
-  grantItem: (itemId: string, quantity: number, source: ItemSource) => Promise<ItemResult>
+  grantItem: (
+    itemId: string,
+    quantity: number,
+    source: ItemSource,
+    refId?: string,
+  ) => Promise<ItemResult>
+  /** บันทึก progression ล็อบบี้แบบ atomic (profile flags + hero EXP + battle history) */
+  commitLobbyBattleProgression: (
+    payload: accounts.LobbyBattleProgressionRpcPayload,
+  ) => Promise<{ ok: true; player: Player } | { ok: false; error: string }>
+  upsertPendingLobbyReward: (
+    result: import('../game/realtimeBattle/types').RealtimeBattleResult,
+    transactionId: string,
+  ) => Promise<boolean>
+  clearPendingLobbyReward: (transactionId: string) => Promise<void>
+  getPendingLobbyRewards: () => Promise<accounts.PendingLobbyRewardRow[]>
   /** ส่งออก save เป็นไฟล์ JSON ไว้สำรอง/ย้ายเครื่อง — คืน null เมื่อสำเร็จ (ไฟล์ถูกดาวน์โหลดแล้ว) */
   exportSave: () => Promise<string | null>
 }
@@ -259,14 +274,39 @@ export function useAuth(): AuthState {
   )
 
   const grantItem = useCallback(
-    async (itemId: string, quantity: number, source: ItemSource) => {
+    async (itemId: string, quantity: number, source: ItemSource, refId?: string) => {
       if (!player) return { ok: false, error: 'ยังไม่ได้ล็อกอิน' } as const
-      const result = await accounts.grantItem(player.uid, itemId, quantity, source)
+      const result = await accounts.grantItem(player.uid, itemId, quantity, source, refId)
       if (result.ok) setPlayer(result.player)
       return result
     },
     [player],
   )
+
+  const commitLobbyBattleProgression = useCallback(
+    async (payload: accounts.LobbyBattleProgressionRpcPayload) => {
+      if (!player) return { ok: false, error: 'ยังไม่ได้ล็อกอิน' } as const
+      const result = await accounts.commitLobbyBattleProgression(payload)
+      if (result.ok) setPlayer(result.player)
+      return result
+    },
+    [player],
+  )
+
+  const upsertPendingLobbyReward = useCallback(
+    async (
+      result: import('../game/realtimeBattle/types').RealtimeBattleResult,
+      transactionId: string,
+    ) => accounts.upsertPendingLobbyReward(result, transactionId),
+    [],
+  )
+
+  const clearPendingLobbyReward = useCallback(
+    async (transactionId: string) => accounts.clearPendingLobbyReward(transactionId),
+    [],
+  )
+
+  const getPendingLobbyRewards = useCallback(async () => accounts.getPendingLobbyRewards(), [])
 
   const exportSave = useCallback(async () => {
     const result = await accounts.exportSave()
@@ -297,6 +337,10 @@ export function useAuth(): AuthState {
     isAdmin,
     grantCharacter,
     grantItem,
+    commitLobbyBattleProgression,
+    upsertPendingLobbyReward,
+    clearPendingLobbyReward,
+    getPendingLobbyRewards,
     exportSave,
   }
 }

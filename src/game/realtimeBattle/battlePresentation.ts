@@ -20,6 +20,8 @@ export interface BattlePresentationConfig {
   enemyHorizontalSpacingNorm: number
   /** Minimum center-to-center separation as multiple of combined collision radii. */
   minSpawnSeparationMul: number
+  /** Visual breathing room while enemies crowd one target; does not enlarge hit/hurt boxes. */
+  enemyCrowdSeparationMul: number
   /** Arena edge margin (fraction of width/height). */
   arenaMarginXNorm: number
   arenaMarginDepthNorm: number
@@ -33,7 +35,8 @@ export const DEFAULT_BATTLE_PRESENTATION: BattlePresentationConfig = {
   centerDepthNorm: 0.55,
   enemyDepthSpacingNorm: 0.09,
   enemyHorizontalSpacingNorm: 0.045,
-  minSpawnSeparationMul: 1.0,
+  minSpawnSeparationMul: 1.25,
+  enemyCrowdSeparationMul: 1.55,
   arenaMarginXNorm: 0.05,
   arenaMarginDepthNorm: 0.08,
 }

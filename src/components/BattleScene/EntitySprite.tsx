@@ -18,7 +18,7 @@ import {
   ENTITY_SPRITE_HEIGHT,
   ENTITY_SPRITE_PITCH_RAD,
   ENTITY_SPRITE_SHADOW_RADIUS,
-  resolveSpriteMeshCenterY,
+  resolveSpriteMeshPresentation,
 } from '../../game/realtimeBattle/entitySpritePresentation'
 import type { RealtimeBattleRuntime } from '../../game/realtimeBattle/RealtimeBattleRuntime'
 import type { EntityState, RealtimeBattleEntity } from '../../game/realtimeBattle/types'
@@ -73,7 +73,14 @@ export function EntitySprite({ runtime, entityId, kind, accent }: EntitySpritePr
   const mesh = useRef<Mesh>(null)
   const shadow = useRef<Mesh>(null)
   const spriteSet = useMemo(() => getBattleSpriteSet(kind), [kind])
-  const meshCenterY = useMemo(() => resolveSpriteMeshCenterY(kind), [kind])
+  const initialFrame = useMemo(
+    () => resolveBattleFrames(spriteSet.idle, 'right')[0] ?? '',
+    [spriteSet],
+  )
+  const initialPresentation = useMemo(
+    () => resolveSpriteMeshPresentation(kind, initialFrame),
+    [initialFrame, kind],
+  )
 
   /** เฟรมเริ่มของแอนิเมชันที่ไม่วน — ต้องรู้ว่าเริ่มเล่นตอนไหนถึงจะเล่นจบแล้วค้างได้ */
   const animationStartMs = useRef(0)
@@ -114,9 +121,14 @@ export function EntitySprite({ runtime, entityId, kind, accent }: EntitySpritePr
     const rawIndex = Math.floor(localSeconds * animation.rate)
     const index = animation.loop ? rawIndex % frames.length : Math.min(frames.length - 1, rawIndex)
 
-    const texture = getBattleTexture(frames[index])
+    const frameUrl = frames[index]
+    const texture = getBattleTexture(frameUrl)
     const material = mesh.current.material as MeshBasicMaterial
     if (texture && material.map !== texture) material.map = texture
+
+    const presentation = resolveSpriteMeshPresentation(kind, frameUrl)
+    mesh.current.scale.set(presentation.scaleX, presentation.scaleY, 1)
+    mesh.current.position.y = presentation.centerY
 
     // ตายแล้วค่อย ๆ จางหาย, โดนตีแล้ววาบสีแดง — ทั้งสองท่าไม่มีเฟรมภาพของตัวเอง
     material.opacity = entity.state === 'dead' ? 0.35 : 1
@@ -141,7 +153,12 @@ export function EntitySprite({ runtime, entityId, kind, accent }: EntitySpritePr
         />
       </mesh>
 
-      <mesh ref={mesh} position={[0, meshCenterY, 0]} rotation={[ENTITY_SPRITE_PITCH_RAD, 0, 0]}>
+      <mesh
+        ref={mesh}
+        position={[0, initialPresentation.centerY, 0]}
+        scale={[initialPresentation.scaleX, initialPresentation.scaleY, 1]}
+        rotation={[ENTITY_SPRITE_PITCH_RAD, 0, 0]}
+      >
         <planeGeometry args={[ENTITY_SPRITE_HEIGHT * ENTITY_SPRITE_ASPECT, ENTITY_SPRITE_HEIGHT]} />
         <meshBasicMaterial
           transparent

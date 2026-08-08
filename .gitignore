@@ -29,8 +29,14 @@ scripts/
 # Per-machine/per-editor local tool config — not project config, each dev's own setup
 .claude/launch.json
 
+# Working-directory concurrency lock — machine-local, never shared (.agents/rules/workdir-concurrency-lock-law.md)
+.agents/workdir.lock
+
 # Cursor IDE local config — machine/cloud-agent only, not project config
 .cursor/
+
+# Antigravity (Gemini) local agent config — same class as .cursor/ above
+.gemini/
 
 # Personal/off-project notes — see .agents/rules/personal-scope-law.md
 # (never goes in the shared, mandatory-read MEMORY.md)

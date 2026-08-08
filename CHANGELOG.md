@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-08-08
+
+Deploy fork PR #73 integration slice (P6 boss + P7 adventure/energy + reward idempotency) plus upstream backend hardening — live was still on 0.12.2 which only covered battle UI fixes
+
+### Added
+
+- P6 spirit guardian boss combat (upstream PR #62)
+- P7 staged adventure progression and energy skeleton (upstream PR #63)
+- Lobby battle reward pipeline with ordered-partial-commit idempotency (`lobbyBattleRewardPipeline.ts`, `0013_reward_idempotency.sql`)
+- Supabase RPC rate limiting (`0011_rpc_rate_limit.sql`) and public profile lookup (`0012_public_profile_lookup.sql`)
+- PGLite integration tests for reward idempotency migration chain
+
+### Fixed
+
+- Lobby battle rewards: refId-guarded gold/item grants, atomic progression commit, pending snapshot resume after reload
+- Friend lookup via `find_player_by_uid` RPC (replaces always-empty direct query)
+
 ## [0.12.2] - 2026-08-08
 
 Deploy upstream PR #39 battle UI fixes to live (live was still on 0.12.1 build from before #39 merged — deploy gate requires a version bump)
