@@ -4,12 +4,14 @@ import type {
   CharacterGrantResult,
   CurrencyResult,
   FriendCandidate,
+  GachaPullResult,
   GoldSource,
   ItemResult,
   ItemSource,
 } from '../data/accountRepository.supabase'
 import { reportError } from '../lib/errors/reportError'
 import { downloadSaveJson } from '../lib/saveFile'
+import type { GachaPullCount } from '../game/gacha/executeGachaPull'
 import type { Player } from '../types/player'
 
 /**
@@ -69,6 +71,8 @@ export interface AuthState {
   grantCharacter: (characterId: string) => Promise<CharacterGrantResult>
   /** ให้ไอเทมจากการเล่น (ดรอป/เควส) — ดู accountRepository.grantItem */
   grantItem: (itemId: string, quantity: number, source: ItemSource) => Promise<ItemResult>
+  /** อัญเชิญ gacha — ดู accountRepository.pullGacha */
+  pullGacha: (bannerId: string, pullCount: GachaPullCount) => Promise<GachaPullResult>
   /** ส่งออก save เป็นไฟล์ JSON ไว้สำรอง/ย้ายเครื่อง — คืน null เมื่อสำเร็จ (ไฟล์ถูกดาวน์โหลดแล้ว) */
   exportSave: () => Promise<string | null>
 }
@@ -268,6 +272,16 @@ export function useAuth(): AuthState {
     [player],
   )
 
+  const pullGacha = useCallback(
+    async (bannerId: string, pullCount: GachaPullCount) => {
+      if (!player) return { ok: false, error: 'ยังไม่ได้ล็อกอิน' } as const
+      const result = await accounts.pullGacha(player.uid, bannerId, pullCount)
+      if (result.ok) setPlayer(result.player)
+      return result
+    },
+    [player],
+  )
+
   const exportSave = useCallback(async () => {
     const result = await accounts.exportSave()
     if (!result.ok) return result.error
@@ -297,6 +311,7 @@ export function useAuth(): AuthState {
     isAdmin,
     grantCharacter,
     grantItem,
+    pullGacha,
     exportSave,
   }
 }

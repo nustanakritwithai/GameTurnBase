@@ -2,8 +2,12 @@ import { useMemo } from 'react'
 import { useModalA11y } from '../../hooks/useModalA11y'
 import { playSfx } from '../../lib/audio/AudioEngine'
 import {
-  REALTIME_STAGES,
-  getOrderedStages,
+  canAffordStageEnergy,
+  normalizeEnergy,
+  tickEnergyRegen,
+} from '../../game/adventure/energySystem'
+import {
+  getAdventureChapters,
   isStageUnlocked,
   type RealtimeBattleStage,
 } from '../../game/realtimeBattle/stageConfig'
@@ -25,13 +29,8 @@ interface StageSelectProps {
 export function StageSelect({ progress, onSelect, onClose }: StageSelectProps) {
   const { shellRef, backdropProps } = useModalA11y<HTMLDivElement>(onClose)
 
-  const chapters = useMemo(() => {
-    const chapterIds = [...new Set(Object.values(REALTIME_STAGES).map((s) => s.chapterId))]
-    return chapterIds.map((chapterId) => ({
-      chapterId,
-      stages: getOrderedStages(chapterId),
-    }))
-  }, [])
+  const chapters = useMemo(() => getAdventureChapters(), [])
+  const energy = useMemo(() => tickEnergyRegen(normalizeEnergy(progress.energy)), [progress.energy])
 
   const handlePick = (stage: RealtimeBattleStage) => {
     void playSfx('buttonClick')
@@ -60,13 +59,15 @@ export function StageSelect({ progress, onSelect, onClose }: StageSelectProps) {
             <ul key={chapterId} className={styles.list}>
               {stages.map((stage) => {
                 const unlocked = isStageUnlocked(stage.id, progress.flags)
+                const affordable = canAffordStageEnergy(energy, stage)
                 const cleared = progress.flags[`trial_cleared_${stage.id}`] === true
+                const selectable = unlocked && affordable
                 return (
                   <li key={stage.id}>
                     <button
                       type="button"
                       className={styles.stage}
-                      disabled={!unlocked}
+                      disabled={!selectable}
                       onClick={() => handlePick(stage)}
                     >
                       <span className={styles.stageName}>{stage.name}</span>
@@ -74,6 +75,7 @@ export function StageSelect({ progress, onSelect, onClose }: StageSelectProps) {
                         {stage.isBoss ? 'บอส' : `ด่าน ${stage.order}`}
                         {cleared ? ' · ผ่านแล้ว' : ''}
                         {!unlocked ? ' · ล็อกอยู่' : ''}
+                        {unlocked && !affordable ? ' · พลังงานไม่พอ' : ''}
                       </span>
                     </button>
                   </li>

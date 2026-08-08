@@ -1,4 +1,16 @@
 import { getCharacter } from '../game/characters'
+import { createDefaultEnergy, normalizeEnergy } from '../game/adventure/energySystem'
+import {
+  createInitialOwnedCharacterProgress,
+  migrateOwnedCharacters,
+} from '../game/progression/progressionMigration'
+import {
+  createGachaPullRefId,
+  createGachaRollSeed,
+  executeGachaPull,
+  type GachaPullCount,
+} from '../game/gacha/executeGachaPull'
+import { createSeededRandom } from '../game/gacha/gachaRoll'
 import { GAME_INFO } from '../game/gameInfo'
 import { getItem } from '../game/items'
 import { generateUid } from '../game/uid'
@@ -7,10 +19,6 @@ import { reportError } from '../lib/errors/reportError'
 import { createSalt, hashPassword, needsRehash, verifyPassword } from '../lib/password'
 import { isStorageAvailable, readJson, removeKey, writeJson } from '../lib/storage'
 import { EMPTY_PROGRESS, type FriendCandidate, type Player } from '../types/player'
-import {
-  createInitialOwnedCharacterProgress,
-  migrateOwnedCharacters,
-} from '../game/progression/progressionMigration'
 import {
   GEM_PACKAGES,
   GOLD_PACKAGES,
@@ -25,6 +33,7 @@ import {
   type GemSource,
   type GoldPackage,
   type GoldSource,
+  type GachaPullResult,
   type ItemResult,
   type ItemSource,
 } from './accountRepository.shared'
@@ -34,6 +43,8 @@ import {
   ย้ายไปอยู่ accountRepository.shared.ts แล้ว — ไฟล์นี้ re-export ต่อเพื่อความเข้ากันได้ย้อนหลัง
   (ผู้เรียกเดิมที่ import ชนิดพวกนี้จาก accountRepository.ts ตรง ๆ ไม่ต้องแก้)
 */
+export type { GachaPullResult }
+export type { GachaPullCount } from '../game/gacha/executeGachaPull'
 export {
   GEM_PACKAGES,
   GOLD_PACKAGES,
@@ -309,7 +320,10 @@ function normalizePlayer(player: Player): Player {
 
   return {
     ...player,
-    progress: player.progress ?? EMPTY_PROGRESS,
+    progress: {
+      ...(player.progress ?? EMPTY_PROGRESS),
+      energy: normalizeEnergy(player.progress?.energy),
+    },
     inventory: player.inventory ?? [],
     friends: player.friends ?? [],
     ownedCharacters: migrateOwnedCharacters(
@@ -350,7 +364,7 @@ function createNewPlayer(uid: string): Player {
     inventory: [],
     friends: [],
     frameId: 'arcane',
-    progress: { ...EMPTY_PROGRESS },
+    progress: { ...EMPTY_PROGRESS, energy: createDefaultEnergy() },
   }
 }
 
@@ -682,6 +696,44 @@ export async function redeemCoupon(uid: string, code: string): Promise<CurrencyR
 
   if (!saveDb(db)) return { ok: false, error: 'บันทึกข้อมูลไม่สำเร็จ' }
   return { ok: true, player: updated.player, amount: coupon.gem }
+}
+
+/* ---------------- อัญเชิญ (gacha) ---------------- */
+
+/** สุ่มอัญเชิญ — หักหยกผ่าน ledger (source `gacha`) แล้วเขียน pity/owned ตาม §7.1 skeleton */
+export async function pullGacha(
+  uid: string,
+  bannerId: string,
+  pullCount: GachaPullCount,
+): Promise<GachaPullResult> {
+  const db = loadDb()
+  const entry = findAccountEntry(db, uid)
+  if (!entry) return { ok: false, error: 'ไม่พบบัญชีผู้เล่น' }
+
+  const [key, account] = entry
+  const player = normalizePlayer(account.player)
+  const refId = createGachaPullRefId(bannerId, pullCount)
+  const executed = executeGachaPull(
+    player,
+    bannerId,
+    pullCount,
+    refId,
+    createSeededRandom(createGachaRollSeed()),
+  )
+  if (!executed.ok) return executed
+
+  const { summary } = executed
+  let updated = appendTransaction(account, {
+    currency: 'gem',
+    source: 'gacha',
+    amount: -summary.gemCost,
+    refId: summary.transactionRefId,
+  })
+  updated = { ...updated, player: summary.player }
+  db.accounts[key] = updated
+
+  if (!saveDb(db)) return { ok: false, error: 'บันทึกข้อมูลไม่สำเร็จ' }
+  return { ok: true, player: normalizePlayer(updated.player), results: summary.results }
 }
 
 /** ประวัติทอง/หยกทั้งหมดของบัญชี เรียงเก่า→ใหม่ — ใช้แสดงหน้าประวัติการทำรายการ */

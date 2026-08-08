@@ -86,6 +86,8 @@ describe('mapOwnedCharacterRow', () => {
       skillLevels: createDefaultSkillLevels(),
       talentState: { unlockedNodes: [] },
       awakeningState: { tier: 0, unlockedEffects: [] },
+      star: 1,
+      duplicateShards: 0,
     })
   })
 })

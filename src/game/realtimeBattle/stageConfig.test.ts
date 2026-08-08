@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { REALTIME_STAGES, getOrderedStages, getRealtimeStage, isStageUnlocked } from './stageConfig'
+import {
+  REALTIME_STAGES,
+  getAdventureChapters,
+  getBossTemplate,
+  getOrderedStages,
+  getRealtimeStage,
+  isStageUnlocked,
+} from './stageConfig'
 
 /**
  * เทสต์ตาม Done-criteria ของ docs/agent-blueprint/16-stage-adventure-system.md
@@ -24,16 +31,25 @@ describe('REALTIME_STAGES มีแชปเตอร์ครบ N ด่าน
   })
 
   it('getOrderedStages เรียงตาม order ไม่ใช่ตามลำดับ object', () => {
-    // ไม่ผูกกับจำนวนด่านทั้งหมดของแชปเตอร์ตายตัว (เติมด่านใหม่ได้เรื่อย ๆ แบบ data-table
-    // entry ตาม Done-criteria #5) เช็คแค่ว่าเรียงตาม order จริง และ trial-01 มาก่อน trial-02
     const ordered = getOrderedStages('chapter-1')
     for (let i = 1; i < ordered.length; i += 1) {
       expect(ordered[i].order).toBeGreaterThanOrEqual(ordered[i - 1].order)
     }
     const trial01Index = ordered.findIndex((s) => s.id === 'trial-01')
-    const trial02Index = ordered.findIndex((s) => s.id === 'trial-02')
+    const trial05Index = ordered.findIndex((s) => s.id === 'trial-05')
     expect(trial01Index).toBeGreaterThanOrEqual(0)
-    expect(trial02Index).toBeGreaterThan(trial01Index)
+    expect(trial05Index).toBeGreaterThan(trial01Index)
+    expect(ordered[trial05Index].isBoss).toBe(true)
+  })
+
+  it('getAdventureChapters ซ่อนสนามทดสอบ dungeon-p5-test', () => {
+    const chapters = getAdventureChapters()
+    expect(chapters.some((chapter) => chapter.chapterId === 'dungeon-p5-test')).toBe(false)
+    expect(chapters.some((chapter) => chapter.chapterId === 'chapter-1')).toBe(true)
+  })
+
+  it('getBossTemplate คืนข้อมูลบอสจริง spirit-guardian-boss', () => {
+    expect(getBossTemplate('spirit-guardian-boss')?.phases).toHaveLength(2)
   })
 })
 
@@ -47,8 +63,13 @@ describe('isStageUnlocked เป็น pure predicate เหนือ Player.pro
   })
 
   it('ด่านถัดไปปลดล็อกเมื่อ flags มี clear-flag ของด่านก่อนหน้าเป็น true', () => {
-    expect(isStageUnlocked('trial-02', { trial_cleared_trial_01: true })).toBe(false) // ชื่อ flag ผิด รูปแบบ (กันพลาด key)
+    expect(isStageUnlocked('trial-02', { trial_cleared_trial_01: true })).toBe(false)
     expect(isStageUnlocked('trial-02', { 'trial_cleared_trial-01': true })).toBe(true)
+  })
+
+  it('trial-05 ปลดล็อกเมื่อเคลียร์ trial-04', () => {
+    expect(isStageUnlocked('trial-05', { 'trial_cleared_trial-04': true })).toBe(true)
+    expect(isStageUnlocked('trial-05', { 'trial_cleared_trial-03': true })).toBe(false)
   })
 
   it('flag เป็น false (เช่น เคยแพ้) ไม่ถือว่าปลดล็อก', () => {

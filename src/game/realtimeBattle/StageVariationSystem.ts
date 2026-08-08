@@ -42,7 +42,16 @@ function resolveSurvivalOutcome(state: RealtimeBattleState): StageOutcome {
 }
 
 /** เคลียร์ทุกคลื่นเหมือน wave แต่แพ้ทันทีถ้า objectiveHp หมดก่อน */
-function resolveDefendOutcome(state: RealtimeBattleState): StageOutcome {
+function tickDefendObjective(state: RealtimeBattleState, deltaMs: number): void {
+  if (state.objectiveHp === null) return
+  const alive = state.enemies.filter((enemy) => enemy.state !== 'dead').length
+  if (alive <= 0) return
+  state.objectiveHp = Math.max(0, state.objectiveHp - alive * 0.05 * (deltaMs / 100))
+}
+
+/** เคลียร์ทุกคลื่นเหมือน wave แต่แพ้ทันทีถ้า objectiveHp หมดก่อน */
+function resolveDefendOutcome(state: RealtimeBattleState, deltaMs: number): StageOutcome {
+  tickDefendObjective(state, deltaMs)
   if (state.objectiveHp !== null && state.objectiveHp <= 0) return 'defeat'
   return resolveWaveOutcome(state)
 }
@@ -102,7 +111,7 @@ export function resolveStageOutcome(state: RealtimeBattleState, deltaMs: number)
     case 'survival':
       return resolveSurvivalOutcome(state)
     case 'defend':
-      return resolveDefendOutcome(state)
+      return resolveDefendOutcome(state, deltaMs)
     case 'time-attack':
       return resolveTimeAttackOutcome(state)
     case 'mini-boss':

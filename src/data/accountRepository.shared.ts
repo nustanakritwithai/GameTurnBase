@@ -1,4 +1,5 @@
 import type { Player } from '../types/player'
+import type { GachaPullOutcome } from '../game/gacha/gachaPipeline'
 
 /**
  * ชนิด/ค่าคงที่/ตัวตรวจสอบที่ใช้ร่วมกันระหว่างทุก backend ของบัญชีผู้เล่น
@@ -12,8 +13,8 @@ import type { Player } from '../types/player'
 
 /** ทองได้จากการเล่น (เควส/ดรอป) หรือเติมเงินจริงก็ได้ */
 export type GoldSource = 'quest' | 'drop' | 'topup'
-/** หยกได้จากการเติมเงินจริง หรือแลกคูปองเท่านั้น — ห้ามมีทางอื่น */
-export type GemSource = 'topup' | 'coupon'
+/** หยกได้จากการเติมเงินจริง แลกคูปอง หรือใช้ gacha — ห้ามมีทางอื่น */
+export type GemSource = 'topup' | 'coupon' | 'gacha'
 
 export interface CurrencyTransaction {
   id: string
@@ -63,7 +64,10 @@ export type ItemSource = GoldSource
 export type ItemResult = { ok: true; player: Player } | { ok: false; error: string }
 
 export type CharacterGrantResult =
-  { ok: true; player: Player; characterId: string } | { ok: false; error: string }
+  { ok: true; player: Player; characterId: string; isNew?: boolean } | { ok: false; error: string }
+
+export type GachaPullResult =
+  { ok: true; player: Player; results: GachaPullOutcome[] } | { ok: false; error: string }
 
 /** ตรวจรูปแบบอีเมลแบบพอดี ๆ — ไม่เข้มจนบล็อกอีเมลที่ใช้ได้จริง */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/

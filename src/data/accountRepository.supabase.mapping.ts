@@ -1,4 +1,5 @@
 import { createDefaultSkillLevels } from '../game/realtimeBattle/SkillProgressionSystem'
+import { normalizeDuplicateShards, normalizeStar } from '../game/stars/starAscension'
 import type { OwnedCharacter } from '../types/player'
 
 export interface OwnedCharacterRow {
@@ -11,6 +12,8 @@ export interface OwnedCharacterRow {
   skill_levels?: OwnedCharacter['skillLevels'] | null
   talent_state?: OwnedCharacter['talentState'] | null
   awakening_state?: OwnedCharacter['awakeningState'] | null
+  star?: number | null
+  duplicate_shards?: number | null
 }
 
 /**
@@ -27,5 +30,7 @@ export function mapOwnedCharacterRow(row: OwnedCharacterRow): OwnedCharacter {
     skillLevels: row.skill_levels ?? createDefaultSkillLevels(),
     talentState: row.talent_state ?? { unlockedNodes: [] },
     awakeningState: row.awakening_state ?? { tier: 0, unlockedEffects: [] },
+    star: normalizeStar(row.star ?? undefined),
+    duplicateShards: normalizeDuplicateShards(row.duplicate_shards ?? undefined),
   }
 }

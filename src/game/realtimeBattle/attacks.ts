@@ -284,6 +284,46 @@ export const ENEMY_ATTACK_ELITE: AttackDefinition = {
 /** @deprecated Use ENEMY_ATTACK_MELEE — kept for imports */
 export const ENEMY_ATTACK = ENEMY_ATTACK_MELEE
 
+/** Boss attack rows — telegraphMs 800–1200ms baseline (§3.6.12) */
+export const SPIRIT_GUARDIAN_BOSS_PHASE_1_ATTACKS: AttackDefinition[] = [
+  {
+    ...ENEMY_ATTACK_MELEE,
+    id: 'sgb-phase1-strike',
+    telegraphMs: 900,
+    damageMultiplier: 1.1,
+    range: 118,
+  },
+  {
+    ...ENEMY_ATTACK_MELEE,
+    id: 'sgb-phase1-sweep',
+    telegraphMs: 1000,
+    damageMultiplier: 1.05,
+    range: 130,
+    hitShape: 'radial',
+    arcDegrees: 120,
+  },
+]
+
+export const SPIRIT_GUARDIAN_BOSS_PHASE_2_ATTACKS: AttackDefinition[] = [
+  {
+    ...ENEMY_ATTACK_ELITE,
+    id: 'sgb-phase2-slam',
+    telegraphMs: 850,
+    damageMultiplier: 1.35,
+    range: 128,
+    knockdown: true,
+  },
+  {
+    ...ENEMY_ATTACK_ELITE,
+    id: 'sgb-phase2-burst',
+    telegraphMs: 1100,
+    damageMultiplier: 1.2,
+    range: 140,
+    hitShape: 'radial',
+    arcDegrees: 180,
+  },
+]
+
 export const ENEMY_ATTACKS: Record<string, AttackDefinition> = {
   'enemy-melee': ENEMY_ATTACK_MELEE,
   'enemy-elite-slam': ENEMY_ATTACK_ELITE,

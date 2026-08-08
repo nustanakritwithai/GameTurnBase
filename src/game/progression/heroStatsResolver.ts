@@ -1,15 +1,20 @@
 import { getCharacter, type CharacterStats } from '../characters'
 import type { HeroCombatStats } from './progressionSchema'
 import { PLACEHOLDER_LEVEL_STAT_GROWTH } from './progressionConfig'
+import { statsAtStar } from '../stars/starAscension'
 
 /** Base stats at level 1 + placeholder linear growth — NON-PRODUCTION. */
-export function resolveHeroLevelStats(heroId: string, level: number): HeroCombatStats | null {
+export function resolveHeroLevelStats(
+  heroId: string,
+  level: number,
+  star = 1,
+): HeroCombatStats | null {
   const character = getCharacter(heroId)
   if (!character) return null
 
   const safeLevel = Math.max(1, level)
   const growthSteps = safeLevel - 1
-  const base = character.stats
+  const base = statsAtStar(character.stats, star)
 
   return {
     hp: Math.round(base.hp + PLACEHOLDER_LEVEL_STAT_GROWTH.hp * growthSteps),
@@ -22,9 +27,10 @@ export function resolveHeroLevelStats(heroId: string, level: number): HeroCombat
 export function resolveFinalCombatStats(input: {
   heroId: string
   level: number
+  star?: number
   equipmentModifiers?: Partial<CharacterStats>
 }): HeroCombatStats | null {
-  const levelStats = resolveHeroLevelStats(input.heroId, input.level)
+  const levelStats = resolveHeroLevelStats(input.heroId, input.level, input.star ?? 1)
   if (!levelStats) return null
   const mods = input.equipmentModifiers ?? {}
   return {

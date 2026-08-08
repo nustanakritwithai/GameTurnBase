@@ -3,8 +3,10 @@ import { reportError } from '../../lib/errors/reportError'
 import type { Player } from '../../types/player'
 import {
   ELITE_STAT_MULTIPLIER,
+  getBossTemplate,
   getEnemyTemplate,
   getRealtimeStage,
+  type BossTemplate,
   type RealtimeBattleStage,
   type RealtimeEnemyTemplate,
 } from './stageConfig'
@@ -56,6 +58,29 @@ function resolveTierStats(template: RealtimeEnemyTemplate) {
   }
 }
 
+type SpawnTemplate =
+  { kind: 'enemy'; template: RealtimeEnemyTemplate } | { kind: 'boss'; template: BossTemplate }
+
+function resolveSpawnTemplate(templateId: string): SpawnTemplate | null {
+  const enemy = getEnemyTemplate(templateId)
+  if (enemy) return { kind: 'enemy', template: enemy }
+  const boss = getBossTemplate(templateId)
+  if (boss) return { kind: 'boss', template: boss }
+  return null
+}
+
+function scaleStats(
+  stats: { maxHp: number; atk: number; def: number },
+  multiplier: number,
+): { maxHp: number; atk: number; def: number } {
+  if (multiplier === 1) return stats
+  return {
+    maxHp: Math.max(1, Math.round(stats.maxHp * multiplier)),
+    atk: Math.max(1, Math.round(stats.atk * multiplier)),
+    def: Math.max(0, Math.round(stats.def * multiplier)),
+  }
+}
+
 export function createPlayerEntity(player: Player): RealtimeBattleEntity | null {
   const leadId = player.teamSlots.find((id): id is string => id !== null) ?? null
   const character = getCharacter(leadId)
@@ -63,7 +88,9 @@ export function createPlayerEntity(player: Player): RealtimeBattleEntity | null 
 
   const owned = player.ownedCharacters.find((entry) => entry.characterId === character.id)
   const level = owned?.level ?? character.level
-  const combatStats = resolveFinalCombatStats({ heroId: character.id, level }) ?? character.stats
+  const star = owned?.star ?? 1
+  const combatStats =
+    resolveFinalCombatStats({ heroId: character.id, level, star }) ?? character.stats
   /** Authoritative battle max HP — same source as progression/profile, not a parallel formula. */
   const maxHp = Math.max(1, combatStats.hp)
 
@@ -104,9 +131,11 @@ export function createWaveEnemies(
   const wave = stage.waves[waveIndex]
   if (!wave) return []
 
+  const difficultyMultiplier = stage.difficultyMultiplier ?? 1
+
   const resolved = wave.enemies.map((entry) => ({
     entry,
-    template: getEnemyTemplate(entry.templateId),
+    spawn: resolveSpawnTemplate(entry.templateId),
   }))
 
   const valid = resolved.filter(
@@ -114,12 +143,12 @@ export function createWaveEnemies(
       item,
     ): item is {
       entry: (typeof wave.enemies)[number]
-      template: NonNullable<ReturnType<typeof getEnemyTemplate>>
-    } => item.template !== null,
+      spawn: NonNullable<ReturnType<typeof resolveSpawnTemplate>>
+    } => item.spawn !== null,
   )
 
   for (const item of resolved) {
-    if (!item.template) {
+    if (!item.spawn) {
       reportError('BATTLE_ENEMY_TEMPLATE_MISSING', 'silent', undefined, {
         templateId: item.entry.templateId,
         stageId: stage.id,
@@ -129,18 +158,59 @@ export function createWaveEnemies(
 
   const formationPositions = resolveEnemyFormation(
     stage,
-    valid.map((item) => ({ collisionRadius: item.template.collisionRadius })),
+    valid.map((item) => ({
+      collisionRadius:
+        item.spawn.kind === 'boss'
+          ? item.spawn.template.collisionRadius
+          : item.spawn.template.collisionRadius,
+    })),
   )
 
   return valid.flatMap((item, index) => {
-    const { template } = item
     const spawn = formationPositions[index]
     if (!spawn) {
       reportError('BATTLE_STAGE_NO_SPAWN', 'silent', undefined, { stageId: stage.id })
       return []
     }
 
-    const stats = resolveTierStats(template)
+    if (item.spawn.kind === 'boss') {
+      const { template } = item.spawn
+      const stats = scaleStats(
+        { maxHp: template.maxHp, atk: template.atk, def: template.def },
+        difficultyMultiplier,
+      )
+      const scaledMaxHp = Math.max(1, Math.round(stats.maxHp * enemyHpScale))
+      const enemy: RealtimeBattleEntity = {
+        id: `enemy-${waveIndex}-${index}`,
+        entityType: 'boss',
+        name: template.name,
+        position: { x: spawn.x, y: spawn.y },
+        velocity: { x: 0, y: 0 },
+        facing: 'left',
+        combatFacing: 'left',
+        state: 'idle',
+        hp: scaledMaxHp,
+        maxHp: scaledMaxHp,
+        atk: stats.atk,
+        def: stats.def,
+        speed: template.speed,
+        collisionRadius: template.collisionRadius,
+        hurtboxRadius: template.hurtboxRadius,
+        attackCooldownRemainingMs: 0,
+        skillCooldownsMs: { skill1: 0, skill2: 0, skill3: 0 },
+        ultimateGauge: 0,
+        invulnerableUntilMs: 0,
+        hitStunRemainingMs: 0,
+        knockdownRemainingMs: 0,
+        getUpRemainingMs: 0,
+        combatTier: 'boss',
+        enemyId: template.id,
+      }
+      return [enemy]
+    }
+
+    const { template } = item.spawn
+    const stats = scaleStats(resolveTierStats(template), difficultyMultiplier)
     const scaledMaxHp = Math.max(1, Math.round(stats.maxHp * enemyHpScale))
     const enemy: RealtimeBattleEntity = {
       id: `enemy-${waveIndex}-${index}`,

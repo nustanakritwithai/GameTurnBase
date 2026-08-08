@@ -10,6 +10,7 @@ import { DungeonSession } from '../components/DungeonSession/DungeonSession'
 import { LobbyBattleSession } from '../components/LobbyBattleSession/LobbyBattleSession'
 import { CharacterRosterModal } from '../components/CharacterRoster/CharacterRosterModal'
 import { ItemsModal } from '../components/ItemsModal/ItemsModal'
+import { SummonModal } from '../components/SummonModal/SummonModal'
 import { MainNavigation } from '../components/MainNavigation/MainNavigation'
 import { ProfileModal } from '../components/ProfileModal/ProfileModal'
 import { SettingsModal, type AudioSettings } from '../components/SettingsModal/SettingsModal'
@@ -23,9 +24,11 @@ import { MOCK_BADGES } from '../data/mockPlayer'
 import type {
   CharacterGrantResult,
   CurrencyResult,
+  GachaPullResult,
   GoldSource,
   ItemResult,
 } from '../data/accountRepository.shared'
+import type { GachaPullCount } from '../game/gacha/executeGachaPull'
 import type { FriendCandidate, Player } from '../types/player'
 import styles from './LobbyPage.module.css'
 
@@ -65,6 +68,8 @@ interface LobbyPageProps {
   onLinkGoogleAccount: () => Promise<string | null>
   /** บัญชีนี้เป็น guest (ยังไม่เคยอัพเกรด) ไหม — โชว์คำเตือนใน SettingsModal */
   isGuest: boolean
+  /** อัญเชิญ gacha — หักหยกผ่าน ledger */
+  onPullGacha: (bannerId: string, pullCount: GachaPullCount) => Promise<GachaPullResult>
 }
 
 export function LobbyPage({
@@ -83,6 +88,7 @@ export function LobbyPage({
   hasGoogleLinked,
   onLinkGoogleAccount,
   isGuest,
+  onPullGacha,
 }: LobbyPageProps) {
   // แจ้งเตือนจดหมาย/ภารกิจยังเป็น mock เพราะยังไม่มีระบบทั้งสองอย่าง
   const badges = MOCK_BADGES
@@ -122,6 +128,7 @@ export function LobbyPage({
   const [dungeonOpen, setDungeonOpen] = useState(false)
   const [addFriendOpen, setAddFriendOpen] = useState(false)
   const [itemsOpen, setItemsOpen] = useState(false)
+  const [summonOpen, setSummonOpen] = useState(false)
   // ค่าเริ่มต้นอ่านจาก engine (persist ผ่าน localStorage) — เก็บ mirror ไว้ที่นี่แค่ให้ React re-render
   const [audio, setAudio] = useState<AudioSettings>(getAudioSettings())
   const handleAudioChange = (next: AudioSettings) => {
@@ -192,6 +199,7 @@ export function LobbyPage({
         onOpenHeroes={() => setRosterOpen(true)}
         onOpenBattle={() => setBattleOpen(true)}
         onOpenItems={() => setItemsOpen(true)}
+        onOpenSummon={() => setSummonOpen(true)}
       />
 
       {/*
@@ -265,6 +273,14 @@ export function LobbyPage({
       ) : null}
 
       {itemsOpen ? <ItemsModal player={player} onClose={() => setItemsOpen(false)} /> : null}
+
+      {summonOpen ? (
+        <SummonModal
+          player={player}
+          onClose={() => setSummonOpen(false)}
+          onPullGacha={onPullGacha}
+        />
+      ) : null}
 
       {settingsOpen ? (
         <SettingsModal

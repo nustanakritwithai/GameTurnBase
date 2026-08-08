@@ -39,6 +39,7 @@ export default function App() {
     isAdmin,
     grantCharacter,
     grantItem,
+    pullGacha,
     exportSave,
   } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
@@ -65,6 +66,7 @@ export default function App() {
             hasGoogleLinked={hasGoogleLinked}
             onLinkGoogleAccount={linkGoogleAccount}
             isGuest={isGuest}
+            onPullGacha={pullGacha}
           />
         </ToastProvider>
       </GameViewport>

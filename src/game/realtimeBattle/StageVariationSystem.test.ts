@@ -366,4 +366,17 @@ describe('Defend เล่นจบได้จริง (Done-criteria #4)', ()
     expect(runtime.getSnapshot().status).toBe('defeat')
     expect(state.player.hp).toBeGreaterThan(0) // แพ้เพราะ objective ไม่ใช่เพราะผู้เล่นตาย
   })
+
+  it('ศัตรูมีชีวิตอยู่ทำให้ objectiveHp ลดลงเรื่อย ๆ จนแพ้', () => {
+    const state = createRealtimeBattle('trial-04', makePlayer())
+    if (!state) throw new Error('เตรียม fixture ไม่สำเร็จ')
+    const startHp = state.objectiveHp ?? 0
+    const runtime = new RealtimeBattleRuntime(state)
+    runtime.step(1000)
+
+    runtime.step(600_000)
+
+    expect(state.objectiveHp).toBeLessThan(startHp)
+    expect(runtime.getSnapshot().status).toBe('defeat')
+  })
 })

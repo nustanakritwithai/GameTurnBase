@@ -2,6 +2,13 @@ import { supabase } from '../lib/supabaseClient'
 import { generateUid } from '../game/uid'
 import { TEAM_SIZE } from '../game/team'
 import { migrateOwnedCharacters } from '../game/progression/progressionMigration'
+import {
+  createGachaPullRefId,
+  createGachaRollSeed,
+  executeGachaPull,
+  type GachaPullCount,
+} from '../game/gacha/executeGachaPull'
+import { createSeededRandom } from '../game/gacha/gachaRoll'
 import { mapOwnedCharacterRow } from './accountRepository.supabase.mapping'
 import { EMPTY_PROGRESS, type FriendCandidate, type Player } from '../types/player'
 import {
@@ -18,6 +25,7 @@ import {
   type GemSource,
   type GoldPackage,
   type GoldSource,
+  type GachaPullResult,
   type ItemResult,
   type ItemSource,
 } from './accountRepository.shared'
@@ -41,7 +49,15 @@ import {
 */
 
 export type { GoldSource, GemSource, ItemSource, AuthResult, CurrencyResult, ItemResult }
-export type { CharacterGrantResult, CurrencyTransaction, FriendCandidate, GemPackage, GoldPackage }
+export type {
+  CharacterGrantResult,
+  CurrencyTransaction,
+  FriendCandidate,
+  GemPackage,
+  GoldPackage,
+  GachaPullResult,
+}
+export type { GachaPullCount } from '../game/gacha/executeGachaPull'
 export { GEM_PACKAGES, GOLD_PACKAGES, PASSWORD_MIN_LENGTH, validateEmail, validatePassword }
 export { mapOwnedCharacterRow } from './accountRepository.supabase.mapping'
 export type { OwnedCharacterRow } from './accountRepository.supabase.mapping'
@@ -59,6 +75,7 @@ interface ProfileRow {
   frame_id: string
   flags: Record<string, boolean>
   defeated_npc_ids: string[]
+  gacha_progress?: Record<string, unknown>
 }
 
 /** ประกอบ Player เต็มรูปจากตารางลูกทั้งหมด — เรียกซ้ำได้จากหลายจุด (login/register/session) */
@@ -124,6 +141,14 @@ async function loadPlayer(profileId: string): Promise<Player | null> {
         finishedAt: h.finished_at,
         durationMs: h.duration_ms ?? undefined,
       })),
+      gacha: {
+        pity:
+          (
+            profile.gacha_progress as {
+              pity?: Record<string, { pullsSinceLastPityRarity: number }>
+            }
+          )?.pity ?? undefined,
+      },
     },
   }
 }
@@ -341,6 +366,9 @@ export async function savePlayer(player: Player): Promise<boolean> {
       frame_id: player.frameId,
       flags: player.progress.flags,
       defeated_npc_ids: player.progress.defeatedNpcIds,
+      gacha_progress: {
+        pity: player.progress.gacha?.pity ?? {},
+      },
     })
     .eq('id', player.id)
 
@@ -356,6 +384,8 @@ export async function savePlayer(player: Player): Promise<boolean> {
     skill_levels: owned.skillLevels,
     talent_state: owned.talentState ?? { unlockedNodes: [] },
     awakening_state: owned.awakeningState ?? { tier: 0, unlockedEffects: [] },
+    star: owned.star ?? 1,
+    duplicate_shards: owned.duplicateShards ?? 0,
   }))
   const { error: charError } = await supabase.from('owned_characters').upsert(charRows, {
     onConflict: 'profile_id,character_id',
@@ -405,6 +435,48 @@ export async function topUpGold(_uid: string, _packageId: string): Promise<Curre
 }
 export async function topUpGems(_uid: string, _packageId: string): Promise<CurrencyResult> {
   return { ok: false, error: 'ระบบเติมเงินยังไม่เปิดให้ใช้งาน' }
+}
+
+/** อัญเชิญ — roll ฝั่ง client (stub) แล้ว commit ผ่าน RPC ให้ ledger + owned สอดคล้องกัน */
+export async function pullGacha(
+  uid: string,
+  bannerId: string,
+  pullCount: GachaPullCount,
+): Promise<GachaPullResult> {
+  const sessionPlayer = await getSessionPlayer()
+  if (!sessionPlayer || sessionPlayer.uid !== uid) {
+    return { ok: false, error: 'ยังไม่ได้ล็อกอิน' }
+  }
+
+  const refId = createGachaPullRefId(bannerId, pullCount)
+  const executed = executeGachaPull(
+    sessionPlayer,
+    bannerId,
+    pullCount,
+    refId,
+    createSeededRandom(createGachaRollSeed()),
+  )
+  if (!executed.ok) return executed
+
+  const { summary } = executed
+  const { error } = await supabase.rpc('apply_gacha_pull', {
+    p_ref_id: refId,
+    p_gem_cost: summary.gemCost,
+    p_banner_id: bannerId,
+    p_pity: summary.pity,
+    p_results: summary.results.map((entry) => ({
+      character_id: entry.characterId,
+      is_new: entry.isNew,
+      star: entry.star,
+      duplicate_shards: entry.duplicateShards,
+    })),
+  })
+
+  if (error) return { ok: false, error: error.message }
+
+  const player = await loadPlayer(sessionPlayer.id)
+  if (!player) return { ok: false, error: 'บันทึกข้อมูลไม่สำเร็จ' }
+  return { ok: true, player, results: summary.results }
 }
 
 export async function getTransactions(uid: string): Promise<CurrencyTransaction[]> {

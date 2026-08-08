@@ -5,6 +5,11 @@ import {
 } from '../realtimeBattle/SkillProgressionSystem'
 import type { SkillSlotId as ProgressionSkillSlotId } from './progressionSchema'
 import { getExpToNextForLevel, progressionConfig } from './progressionConfig'
+import {
+  normalizeDuplicateShards,
+  normalizeStar,
+  ownedCharacterWithStarDefaults,
+} from '../stars/starAscension'
 
 export const SKILL_SLOTS: ProgressionSkillSlotId[] = ['skill1', 'skill2', 'skill3', 'ultimate']
 
@@ -40,14 +45,15 @@ export function createInitialOwnedCharacterProgress(
     talentState: { unlockedNodes: [] },
     awakeningState: { tier: 0, unlockedEffects: [] },
     progressionVersion: 1,
+    star: 1,
+    duplicateShards: 0,
   }
 }
 
 export function sanitizeOwnedCharacter(owned: OwnedCharacter): OwnedCharacter {
   const level = Math.max(1, Math.min(progressionConfig.maxHeroLevel, Math.floor(owned.level) || 1))
   const exp = Math.max(0, Math.floor(owned.exp) || 0)
-  const expToNext =
-    level >= progressionConfig.maxHeroLevel ? 0 : getExpToNextForLevel(level)
+  const expToNext = level >= progressionConfig.maxHeroLevel ? 0 : getExpToNextForLevel(level)
 
   return {
     ...owned,
@@ -63,18 +69,22 @@ export function sanitizeOwnedCharacter(owned: OwnedCharacter): OwnedCharacter {
       unlockedEffects: [...(owned.awakeningState?.unlockedEffects ?? [])],
     },
     progressionVersion: owned.progressionVersion ?? 1,
+    star: normalizeStar(owned.star),
+    duplicateShards: normalizeDuplicateShards(owned.duplicateShards),
   }
 }
 
 export function migrateOwnedCharacters(ownedCharacters: OwnedCharacter[]): OwnedCharacter[] {
   return ownedCharacters.map((owned) =>
-    sanitizeOwnedCharacter({
-      ...owned,
-      skillLevels: owned.skillLevels ?? createDefaultSkillLevels(),
-      talentState: owned.talentState ?? { unlockedNodes: [] },
-      awakeningState: owned.awakeningState ?? { tier: 0, unlockedEffects: [] },
-      progressionVersion: owned.progressionVersion ?? 1,
-    }),
+    ownedCharacterWithStarDefaults(
+      sanitizeOwnedCharacter({
+        ...owned,
+        skillLevels: owned.skillLevels ?? createDefaultSkillLevels(),
+        talentState: owned.talentState ?? { unlockedNodes: [] },
+        awakeningState: owned.awakeningState ?? { tier: 0, unlockedEffects: [] },
+        progressionVersion: owned.progressionVersion ?? 1,
+      }),
+    ),
   )
 }
 
