@@ -99,6 +99,18 @@ describe('applyHeroExpToProgress', () => {
       }),
     ).toThrow()
   })
+
+  it('overflow EXP หลัง max level ถูก clamp เป็น 0 (maxLevelExpBehavior)', () => {
+    const atMax = progressionConfig.maxHeroLevel
+    const result = applyHeroExpToProgress({
+      heroId: 'monkey-king',
+      level: atMax,
+      currentExp: 999,
+      amount: 5000,
+    })
+    expect(result.newExp).toBe(0)
+    expect(result.atMaxLevel).toBe(true)
+  })
 })
 
 describe('applyHeroExp service', () => {
