@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-08T19:20:00+07:00 by `Cursor Agent` — upstream PR #64 merged (v0.12.3 live deploy); PR-4 P8 playtest tests staged; see items 148–149.
+> **Last Updated**: 2026-08-08T19:25:00+07:00 by `Cursor Agent` — upstream PR #65 merged; fork PR #73 split closed (P6/P7/Reward/P8); see items 150–151.
 > **RULES_VERSION last synced: 25** (local `master`, this session) — bumped 17→18 (multi-dev task queue law) →19 (Agent Blueprint execution-order rule) →20 (Ring 0 traffic control law) →21 (claim protocol made Ring-0-locked) →22 (break-glass claim fallback for repo-admin devs) →23 (security doc sync law, from a `/gold-standard` AUDIT) →24 (tasks/memory parity law, HetCreep asked directly after catching TASKS.md drift twice) →25 (working-directory concurrency lock law, added after Claude/Antigravity live collision) within this same session. **Unrelated note carried forward**: an earlier version of this line read "19" citing a pending fork PR #59 (Cursor Agent, cloud) that was never found merged to `origin/master` — this session passed through 19 independently via 17→18→19→20→21→22→23→24→25, not a confirmation of that PR landing. Still worth reconciling numbering with PR #59 if/when it lands.
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
@@ -27,8 +27,8 @@
 
 ## 🎯 Current Status
 
-- **Repo**: upstream PR #62–#64 merged (P6/P7/reward) · **v0.12.3** on upstream `master` @ `31f0092` · PR-4 P8 playtest tests open on fork.
-- **Version**: **0.12.3** on upstream — deploy gate should trigger GH Pages redeploy with P6/P7/reward integration. Apply migrations `0009`–`0013` on live Supabase still pending Ring 0.
+- **Repo**: upstream PR #62–#65 merged — fork PR #73 split **closed** (P6/P7/Reward/P8) · **v0.12.3** @ `16b4949` · tag `v0.12.3` · P9 gacha/stars still out of scope.
+- **Version**: **0.12.3** on upstream — **659 tests**. Live deploy via v0.12.3 tag. Apply Supabase migrations `0009`–`0013` on production DB still pending Ring 0 manual step.
 - **Org/Live**: `KatomnoiStudio` — https://katomnoistudio.github.io/LegendOfSoulTH/
 - **Backend**: Supabase Auth+Postgres live, wired via `useAuth.ts` (item 41/87). `accountRepository.ts` (localStorage) stays as a dormant fallback seam only.
 - **Master Blueprint v3.0**: P0–P3 DONE · §3.6/§3.7 LOCKED · mobile combat UI done (§3.3) · P4 LANDED (item 109) · P5 dungeon slice + reward pipeline LANDED (items 111-112) · P8 per-hero progression LANDED (item 119, numerics still NON-PRODUCTION) · Basic Attack Lunge Distance closed (item 124).
@@ -223,4 +223,5 @@ All entries 2026-08-05/06 unless noted. Roughly chronological.
 146. **Item 145's 3 residual gaps closed the same session (2026-08-08)** — HetCreep: RPC rate limiting (`0011_rpc_rate_limit.sql`), `findPlayerByUid` via `0012_public_profile_lookup.sql`, and 12 Supabase-wrapper tests in `accountRepository.supabase.test.ts`. Full `npm run ci` green (630 tests). HetCreep must apply migrations 0009–0012 via Supabase dashboard.
 147. **Fork PR #73 split — PR-3 reward idempotency rebased (2026-08-08, Cursor Agent)** — After upstream PR #62 (P6) + #63 (P7) + item 146 backend sweep, `integration/reward-idempotency` adds `lobbyBattleRewardPipeline.ts`, `0013_reward_idempotency.sql` (builds on 0011 rate-limit + refId dedupe), Supabase RPC wiring, 654 tests green. **v0.12.3** bump triggers deploy gate for integration work missing from 0.12.2. HetCreep must apply `0013` after 0011/0012.
 148. **Upstream PR #64 merged (2026-08-08)** — `integration/reward-idempotency` landed @ `31f0092` on `KatomnoiStudio/LegendOfSoulTH` master with v0.12.3. Fork PR #73 split complete for P6/P7/Reward (P9 still out of scope).
-149. **Fork PR #73 split — PR-4 P8 playtest regression tests (2026-08-08, Cursor Agent)** — `integration/p8-playtest` from upstream @ `31f0092`: P8 progression view-model tests, max-level EXP clamp, dungeon first-clear replay guard. Tests-only, no version bump (659 tests green). **Delivery**: fork tracking PR + upstream compare for Ring 0.
+149. **Fork PR #73 split — PR-4 P8 playtest regression tests (2026-08-08, Cursor Agent)** — `integration/p8-playtest` from upstream @ `31f0092`: P8 progression view-model tests, max-level EXP clamp, dungeon first-clear replay guard. Tests-only (659 tests green). Upstream PR #65 merged @ `16b4949`.
+150. **Fork PR #73 split — CLOSED (2026-08-08)** — All four scoped upstream PRs landed: #62 P6 boss, #63 P7 adventure/energy, #64 reward idempotency (+ v0.12.3 deploy), #65 P8 playtest tests. P9 gacha/stars explicitly out of scope per master-blueprint-law. Remaining Ring-0 ops: apply migrations 0009–0013 to live Supabase; manual playtest before dropping NON-PRODUCTION banner.
