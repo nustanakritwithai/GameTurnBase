@@ -1,5 +1,9 @@
 import { TEMPLE_LOBBY_BG, BATTLE_ART_BG } from '../backgroundAssets'
 import type { AttackDefinition } from './attacks'
+import {
+  SPIRIT_GUARDIAN_BOSS_PHASE_1_ATTACKS,
+  SPIRIT_GUARDIAN_BOSS_PHASE_2_ATTACKS,
+} from './attacks'
 import type { CharacterModelKind } from '../characters'
 import { resolvePlayerSpawn } from './spawnFormation'
 import type { EnemyTier, Vec2 } from './types'
@@ -123,10 +127,31 @@ export interface BossTemplate {
 }
 
 /**
- * เนื้อหาบอสจริง (วางลงด่านไหน ตอนไหน) เป็นงานของ #16/#17 Stage/Adventure System — ตารางนี้
- * เตรียมโครงไว้ให้ agent ถัดไปเติมข้อมูล ไม่ใช่ scope ของ Boss System เอง (ดู contract §Scope)
+ * เนื้อหาบอสจริง — วางลงด่านผ่าน templateId ใน waves (§11 Boss System)
  */
-export const BOSS_TEMPLATES: Record<string, BossTemplate> = {}
+export const BOSS_TEMPLATES: Record<string, BossTemplate> = {
+  'spirit-guardian-boss': {
+    id: 'spirit-guardian-boss',
+    name: 'ผู้พิทักษ์วิญญาณ',
+    spriteKind: 'pilgrim-monk',
+    accent: '#4dffb0',
+    maxHp: 1400,
+    atk: 78,
+    def: 28,
+    speed: 128,
+    collisionRadius: 46,
+    hurtboxRadius: 54,
+    detectRange: 1800,
+    attackRange: 92,
+    attackCooldownMs: 1800,
+    phaseHpThreshold: 0.5,
+    phaseTransitionMs: 2000,
+    phases: [
+      { attacks: SPIRIT_GUARDIAN_BOSS_PHASE_1_ATTACKS as BossAttackRow[] },
+      { attacks: SPIRIT_GUARDIAN_BOSS_PHASE_2_ATTACKS as BossAttackRow[] },
+    ],
+  },
+}
 
 export function getBossTemplate(id: string): BossTemplate | null {
   return BOSS_TEMPLATES[id] ?? null

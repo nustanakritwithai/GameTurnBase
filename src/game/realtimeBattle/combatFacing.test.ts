@@ -19,6 +19,11 @@ describe('combatFacing (P2 L/R attack)', () => {
     expect(combatFacingFromVector({ x: -1, y: 0 }, 'right')).toBe('left')
     expect(combatFacingFromVector({ x: 1, y: 0 }, 'left')).toBe('right')
     expect(combatFacingFromVector({ x: 0, y: -1 }, 'left')).toBe('left')
+    expect(combatFacingFromVector({ x: 0, y: -1 }, 'right')).toBe('right')
+    expect(combatFacingFromVector({ x: 0, y: 1 }, 'left')).toBe('left')
+    expect(combatFacingFromVector({ x: 0, y: 1 }, 'right')).toBe('right')
+    expect(combatFacingFromVector({ x: 0.1, y: 0.5 }, 'left')).toBe('left')
+    expect(combatFacingFromVector({ x: -0.1, y: -0.5 }, 'right')).toBe('right')
   })
 
   it('faces target on horizontal axis', () => {

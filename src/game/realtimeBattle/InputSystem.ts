@@ -71,10 +71,18 @@ export class InputSystem {
     target.addEventListener('keyup', onKeyUp)
     target.addEventListener('blur', onBlur)
 
+    const doc = target.document
+    if (doc) {
+      doc.addEventListener('visibilitychange', onBlur)
+    }
+
     return () => {
       target.removeEventListener('keydown', onKeyDown)
       target.removeEventListener('keyup', onKeyUp)
       target.removeEventListener('blur', onBlur)
+      if (doc) {
+        doc.removeEventListener('visibilitychange', onBlur)
+      }
       this.pressedKeys.clear()
     }
   }

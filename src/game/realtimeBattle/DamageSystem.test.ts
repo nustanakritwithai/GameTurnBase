@@ -172,4 +172,109 @@ describe('applyDamage', () => {
     expect(target.state).toBe('dead')
     expect(target.position).toEqual({ x: 500, y: 500 })
   })
+
+  it('Done-criterion 2: HP > 0 sets state="hit", hitStunRemainingMs, and invulnerableUntilMs correctly', () => {
+    const attacker = entity({ id: 'player' })
+    const target = entity({ hp: 100 })
+    applyDamage({
+      attacker,
+      target,
+      attack: PLAYER_ATTACK,
+      elapsedMs: 500,
+      random: fakeRandom(0.5, 0.99),
+    })
+    expect(target.state).toBe('hit')
+    expect(target.hitStunRemainingMs).toBe(200) // resolveHitstunMs default is 200
+    expect(target.invulnerableUntilMs).toBe(500 + 120)
+  })
+
+  it('Done-criterion 3: knockback displacement direction is deterministic for horizontal vs radial/other shapes', () => {
+    const attacker = entity({ id: 'player', combatFacing: 'left', facing: 'up' })
+
+    // Test horizontal hitShape - should use combatFacing (left)
+    const targetHoriz = entity({ position: { x: 500, y: 500 } })
+    const horizontalAttack = { ...PLAYER_ATTACK, hitShape: 'horizontal' as const, knockback: 50 }
+    applyDamage({
+      attacker,
+      target: targetHoriz,
+      attack: horizontalAttack,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+    // combatFacing = 'left' -> horizontal vector is { x: -1, y: 0 }. push-out is -50px in x
+    expect(targetHoriz.position.x).toBe(500 - 50)
+    expect(targetHoriz.position.y).toBe(500)
+
+    // Test radial hitShape - should use facing (up)
+    const targetRadial = entity({ position: { x: 500, y: 500 } })
+    const radialAttack = { ...PLAYER_ATTACK, hitShape: 'radial' as const, knockback: 50 }
+    applyDamage({
+      attacker,
+      target: targetRadial,
+      attack: radialAttack,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+    // facing = 'up' -> directionVector('up') is { x: 0, y: -1 }. push-out is -50px in y
+    expect(targetRadial.position.x).toBe(500)
+    expect(targetRadial.position.y).toBe(500 - 50)
+  })
+
+  it('Done-criterion 5: knockdown flag is inert against normal mobs but active on elite/boss', () => {
+    const attacker = entity({ id: 'player' })
+    const normalTarget = entity({ hp: 100, combatTier: 'mob', entityType: 'enemy' })
+    const eliteTarget = entity({ hp: 100, combatTier: 'elite', entityType: 'enemy' })
+    const knockdownAttack = { ...PLAYER_ATTACK, knockdown: true }
+
+    // Mob target - should NOT knockdown, should just do normal hitstun
+    applyDamage({
+      attacker,
+      target: normalTarget,
+      attack: knockdownAttack,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+    expect(normalTarget.state).toBe('hit')
+    expect(normalTarget.knockdownRemainingMs).toBe(0)
+
+    // Elite target - should knockdown
+    applyDamage({
+      attacker,
+      target: eliteTarget,
+      attack: knockdownAttack,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+    expect(eliteTarget.state).toBe('knockdown')
+    expect(eliteTarget.knockdownRemainingMs).toBe(700) // resolveKnockdownMs default is 700
+  })
+
+  it('Scar 2: flat global hitstun allows continuous lock if hit rate is high enough (150ms cadence)', () => {
+    const attacker = entity({ id: 'player' })
+    const target = entity({ hp: 1000 })
+
+    // First hit at 0ms
+    applyDamage({
+      attacker,
+      target,
+      attack: PLAYER_ATTACK,
+      elapsedMs: 0,
+      random: fakeRandom(0.5, 0.99),
+    })
+    expect(target.hitStunRemainingMs).toBe(200)
+
+    // Advance 150ms
+    target.hitStunRemainingMs -= 150
+    expect(target.hitStunRemainingMs).toBe(50)
+
+    // Second hit at 150ms (outside 120ms invulnerability window)
+    applyDamage({
+      attacker,
+      target,
+      attack: PLAYER_ATTACK,
+      elapsedMs: 150,
+      random: fakeRandom(0.5, 0.99),
+    })
+    expect(target.hitStunRemainingMs).toBe(200) // reset to 200
+  })
 })

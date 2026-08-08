@@ -70,6 +70,7 @@ const OPTIONAL_FIELDS = [
   'targetLock',
   'effects',
   'knockdown',
+  'lungeDistance',
   // P4 combat core (upstream PR #29, reconciled into this repo's Tier-1 systems merge)
   'telegraphMs',
   'hitstunMs',
@@ -149,5 +150,168 @@ describe('Move data lives only in attacks.ts (done-criterion #5)', () => {
       .map(([path]) => path)
 
     expect(offenders).toEqual([])
+  })
+})
+
+import { findHitTargets } from './HitboxSystem'
+import { resolveEffect } from './EffectsSystem'
+import { getMovePhase } from './combatMoveSchema'
+import type { RealtimeBattleEntity } from './types'
+
+function makeMockEntity(overrides: Partial<RealtimeBattleEntity> = {}): RealtimeBattleEntity {
+  return {
+    id: 'entity-1',
+    entityType: 'enemy',
+    name: 'Mock Unit',
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    facing: 'right',
+    combatFacing: 'right',
+    state: 'idle',
+    hp: 100,
+    maxHp: 100,
+    atk: 50,
+    def: 20,
+    speed: 100,
+    collisionRadius: 34,
+    hurtboxRadius: 40,
+    attackCooldownRemainingMs: 0,
+    skillCooldownsMs: { skill1: 0, skill2: 0, skill3: 0 },
+    ultimateGauge: 0,
+    invulnerableUntilMs: 0,
+    hitStunRemainingMs: 0,
+    knockdownRemainingMs: 0,
+    getUpRemainingMs: 0,
+    combatTier: 'mob',
+    ...overrides,
+  }
+}
+
+describe('Per-Move Property Schema — Known Scars checks', () => {
+  it('Scar 1: ยืนยันว่า HitboxSystem ตรวจจับและใช้ฟิลด์ range/geometry ของ AttackDefinition ต่างๆ อย่างเข้มงวดเมื่อเคลื่อนไหวหรือโจมตีกลางอากาศ (Jump-attack)', () => {
+    const attacker = makeMockEntity({
+      id: 'attacker',
+      combatFacing: 'right',
+      position: { x: 0, y: 0 },
+    })
+    const target = makeMockEntity({ id: 'target', position: { x: 100, y: 0 }, hurtboxRadius: 20 })
+
+    // ท่าบนพื้นปกติ (normal ground strike): ระยะโจมตี 120 (สามารถโจมตีโดน target ระยะ x=100 ได้เพราะ distance (100 - 20 = 80) <= 120)
+    const groundStrike: AttackDefinition = {
+      id: 'ground-strike',
+      animationId: 'attack-1',
+      startupMs: 100,
+      activeMs: 100,
+      recoveryMs: 100,
+      comboWindowStartMs: 0,
+      comboWindowEndMs: 0,
+      damageMultiplier: 1.0,
+      range: 120,
+      hitShape: 'horizontal',
+      arcDegrees: 0,
+      depthTolerance: 100,
+      knockback: 50,
+    }
+
+    // ท่ากลางอากาศ/ขณะพุ่ง (jump-strike variant): ระยะโจมตีสั้นลงเหลือ 60 (ระยะเอื้อม 80 > 60 ทำให้โจมตีไม่โดน)
+    const jumpStrike: AttackDefinition = {
+      ...groundStrike,
+      id: 'jump-strike',
+      range: 60,
+    }
+
+    // ground strike ต้องตีโดน
+    const groundHits = findHitTargets([target], {
+      attacker,
+      attack: groundStrike,
+      alreadyHit: new Set(),
+      elapsedMs: 150,
+    })
+    expect(groundHits).toContainEqual(target)
+
+    // jump strike ต้องตีไม่โดน (พิสูจน์ว่า HitboxSystem ไม่ละเลยความแตกต่างของฟิลด์ range)
+    const jumpHits = findHitTargets([target], {
+      attacker,
+      attack: jumpStrike,
+      alreadyHit: new Set(),
+      elapsedMs: 150,
+    })
+    expect(jumpHits).not.toContainEqual(target)
+  })
+
+  it('Scar 2: ยืนยันว่า EffectsSystem สามารถประมวลผลเอฟเฟกต์ที่มีอยู่บน AttackDefinition ได้อย่างถูกต้องกับทุกคู่ร่าย/เป้าหมายที่กำหนด (ไม่เกิด hard-code เจาะจงเฉพาะคู่แรกที่เทสต์)', () => {
+    const ownerA = makeMockEntity({ id: 'ownerA', entityType: 'player', hp: 50, maxHp: 100 })
+    const allyA = makeMockEntity({ id: 'allyA', entityType: 'player', hp: 80, maxHp: 100 })
+
+    const ownerB = makeMockEntity({ id: 'ownerB', entityType: 'player', hp: 30, maxHp: 100 })
+    const allyB = makeMockEntity({ id: 'allyB', entityType: 'player', hp: 40, maxHp: 100 })
+
+    // เอฟเฟกต์ฮีลให้กับตัวผู้ใช้
+    const selfHealEffect: AttackDefinition = {
+      id: 'self-heal-move',
+      animationId: 'skill-1',
+      startupMs: 100,
+      activeMs: 100,
+      recoveryMs: 100,
+      comboWindowStartMs: 0,
+      comboWindowEndMs: 0,
+      damageMultiplier: 0,
+      range: 100,
+      hitShape: 'radial',
+      arcDegrees: 360,
+      depthTolerance: 0,
+      knockback: 0,
+      effects: [{ kind: 'heal', target: 'self', healAmount: 20 }],
+    }
+
+    // คู่ A: รันเอฟเฟกต์กับคู่ A
+    const contextA = { owner: ownerA, allies: [allyA], enemies: [] }
+    selfHealEffect.effects?.forEach((eff) => {
+      resolveEffect(eff, contextA)
+    })
+    expect(ownerA.hp).toBe(70) // 50 + 20
+
+    // คู่ B: รันเอฟเฟกต์กับคู่ B ด้วยโค้ดชุดเดียวกัน ต้องทำงานถูกต้อง ไม่ใช่ทำงานได้แค่คู่ A
+    const contextB = { owner: ownerB, allies: [allyB], enemies: [] }
+    selfHealEffect.effects?.forEach((eff) => {
+      resolveEffect(eff, contextB)
+    })
+    expect(ownerB.hp).toBe(50) // 30 + 20
+  })
+
+  it('Scar 3: ยืนยันความสอดคล้องระหว่างช่วงเฟรมโจมตีของแอนิเมชันกับจังหวะคำนวณของ HitboxSystem (ช่วง Active Window) ต้องตรงกันทุกช่วงเวลา', () => {
+    const attack: AttackDefinition = {
+      id: 'test-timing-move',
+      animationId: 'attack-1',
+      telegraphMs: 200,
+      startupMs: 150,
+      activeMs: 250,
+      recoveryMs: 300,
+      comboWindowStartMs: 0,
+      comboWindowEndMs: 0,
+      damageMultiplier: 1.0,
+      range: 100,
+      hitShape: 'horizontal',
+      arcDegrees: 0,
+      depthTolerance: 100,
+      knockback: 10,
+    }
+
+    // telegraph window: 0 - 200ms
+    expect(getMovePhase(attack, 100)).toBe('telegraph')
+    expect(getMovePhase(attack, 200)).toBe('startup')
+
+    // startup window: 200 - 350ms
+    expect(getMovePhase(attack, 300)).toBe('startup')
+
+    // active window: 350 - 600ms
+    expect(getMovePhase(attack, 400)).toBe('active')
+    expect(getMovePhase(attack, 500)).toBe('active')
+
+    // recovery window: 600 - 900ms
+    expect(getMovePhase(attack, 700)).toBe('recovery')
+
+    // complete: > 900ms
+    expect(getMovePhase(attack, 950)).toBe('complete')
   })
 })

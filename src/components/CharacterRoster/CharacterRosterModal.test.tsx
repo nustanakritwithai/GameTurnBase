@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { CharacterRosterModal } from './CharacterRosterModal'
 import { ToastProvider } from '../Toast/ToastProvider'
 import { createDefaultSkillLevels } from '../../game/realtimeBattle/SkillProgressionSystem'
-import { EMPTY_PROGRESS, type Player } from '../../types/player'
+import { EMPTY_PROGRESS, type Player, type OwnedCharacter } from '../../types/player'
 
 /*
   หน้าทำเนียบวีรชนคือทางเดียวที่ผู้เล่นดูตัวละครที่ครอบครองอยู่ทั้งหมด — ถ้า roster
@@ -107,5 +107,35 @@ describe('CharacterRosterModal', () => {
 
     expect(onClose).not.toHaveBeenCalled()
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  test('Done-criterion 4: handles ownedCharacters without skillLevels field gracefully (backward compatibility)', () => {
+    const legacyPlayer: Player = {
+      ...buildPlayer(),
+      ownedCharacters: [
+        {
+          characterId: 'monkey-king',
+          level: 40,
+          exp: 7320,
+          expToNext: 12000,
+          obtainedAt: '2026-01-01T00:00:00.000Z',
+          // skillLevels is missing
+        } as unknown as OwnedCharacter,
+      ],
+    }
+
+    render(
+      <ToastProvider>
+        <CharacterRosterModal
+          player={legacyPlayer}
+          onClose={vi.fn()}
+          onPlayerChange={vi.fn(async () => true)}
+        />
+      </ToastProvider>,
+    )
+
+    // Should render successfully and show "เลเวล 1" for skills
+    expect(screen.getByRole('heading', { name: 'ซุนหงอคง' })).toBeInTheDocument()
+    expect(screen.getAllByText(/เลเวล 1/)).toHaveLength(4) // 4 skills start at lvl 1
   })
 })
