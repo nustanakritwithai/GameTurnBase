@@ -198,31 +198,31 @@ describe('SkillSystem', () => {
     startSkill(unit, skill, ultimate, 0)
     expect(isCastingSkill(skill)).toBe(true)
 
-    // 1. During startup phase (at 100ms, startupMs is 220)
-    stepSkill(unit, skill, 100) // elapsed = 100ms
-    unit.hitStunRemainingMs = 120
-    stepSkill(unit, skill, 0) // run step with hitstun
-    // Should NOT cancel because startup phase is non-interruptible
-    expect(isCastingSkill(skill)).toBe(true)
-
-    // Clear hitstun for step progression
-    unit.hitStunRemainingMs = 0
-
-    // 2. During active phase (advance by 200ms -> total elapsed = 300ms, which is > 220 and < 220+520)
-    stepSkill(unit, skill, 200)
+    // 1. During castDelay phase (480ms wind-up on ult)
+    stepSkill(unit, skill, 100)
     unit.hitStunRemainingMs = 120
     stepSkill(unit, skill, 0)
-    // Should NOT cancel because active phase is non-interruptible
     expect(isCastingSkill(skill)).toBe(true)
-
-    // Clear hitstun
     unit.hitStunRemainingMs = 0
 
-    // 3. During recovery phase (advance by 500ms -> total elapsed = 800ms, which is > 220+520)
-    stepSkill(unit, skill, 500)
+    // 2. During startup (after castDelay)
+    stepSkill(unit, skill, 450) // elapsed 550ms → 70ms into startup
     unit.hitStunRemainingMs = 120
     stepSkill(unit, skill, 0)
-    // Should cancel because recovery phase override has interruptible: true
+    expect(isCastingSkill(skill)).toBe(true)
+    unit.hitStunRemainingMs = 0
+
+    // 3. During active
+    stepSkill(unit, skill, 350) // elapsed 900ms
+    unit.hitStunRemainingMs = 120
+    stepSkill(unit, skill, 0)
+    expect(isCastingSkill(skill)).toBe(true)
+    unit.hitStunRemainingMs = 0
+
+    // 4. During recovery (castDelay 480 + startup 220 + active 520 = 1220)
+    stepSkill(unit, skill, 400) // elapsed 1300ms
+    unit.hitStunRemainingMs = 120
+    stepSkill(unit, skill, 0)
     expect(isCastingSkill(skill)).toBe(false)
   })
 
@@ -361,5 +361,34 @@ describe('targetLock: nearest (ระบบ #8 Skill-Targeting System)', () => {
     stepSkill(unit, skill, totalDurationMs(ultimate.attack) + 1)
 
     expect(skill.lockedTargetId).toBeNull()
+  })
+
+  it('castDelayMs หน่วง active window — S2 baseline 250ms (§3.6.12)', () => {
+    const unit = player()
+    const skill = createSkillState()
+    const monkeyKit = getRealtimeSkillKit('monkey-king')
+    if (!monkeyKit) throw new Error('ไม่พบ kit หงอคง')
+    const definition = getSkillFromKit(monkeyKit, 'skill2')
+    expect(definition.attack.castDelayMs).toBe(250)
+
+    startSkill(unit, skill, definition, 0)
+
+    const beforeActive = definition.attack.castDelayMs! + definition.attack.startupMs - 1
+    expect(stepSkill(unit, skill, beforeActive).hitboxActive).toBe(false)
+
+    expect(stepSkill(unit, skill, 1).hitboxActive).toBe(true)
+  })
+
+  it('castDelayMs undefined = พฤติกรรมเดิม (S1 ไม่มี cast delay)', () => {
+    const unit = player()
+    const skill = createSkillState()
+    const monkeyKit = getRealtimeSkillKit('monkey-king')
+    if (!monkeyKit) throw new Error('ไม่พบ kit หงอคง')
+    const definition = getSkillFromKit(monkeyKit, 'skill1')
+    expect(definition.attack.castDelayMs).toBeUndefined()
+
+    startSkill(unit, skill, definition, 0)
+    expect(stepSkill(unit, skill, definition.attack.startupMs - 1).hitboxActive).toBe(false)
+    expect(stepSkill(unit, skill, 1).hitboxActive).toBe(true)
   })
 })

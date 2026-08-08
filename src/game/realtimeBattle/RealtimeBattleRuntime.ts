@@ -4,6 +4,7 @@ import { createWaveEnemies, type RealtimeBattleState } from './createRealtimeBat
 import { DEFAULT_BATTLE_PRESENTATION } from './battlePresentation'
 import { resolveStageOutcome } from './StageVariationSystem'
 import { combatFacingFromVector } from './combatFacing'
+import { allowsMovementDuringCast } from './combatMoveSchema'
 import type { RandomFn } from './DamageSystem'
 import {
   createEnemyBrain,
@@ -124,6 +125,10 @@ export class RealtimeBattleRuntime {
     for (const enemy of state.enemies) this.tickTimers(enemy, deltaMs)
 
     const castingSkill = isCastingSkill(this.playerSkill)
+    const movementDuringSkillCast =
+      castingSkill &&
+      this.playerSkill.definition !== null &&
+      allowsMovementDuringCast(this.playerSkill.definition.attack)
 
     if (this.skillSlotRequested) {
       const slot = this.skillSlotRequested
@@ -146,6 +151,13 @@ export class RealtimeBattleRuntime {
       // สถานะเดิน/ยืน คุมจากผลของระบบเดินจุดเดียว ไม่ให้ component เดาเอง
       if (state.player.state === 'idle' && moved) state.player.state = 'walk'
       else if (state.player.state === 'walk' && !moved) state.player.state = 'idle'
+    } else if (movementDuringSkillCast) {
+      const moved = stepMovement(state.player, this.moveInput, deltaMs, {
+        stage: state.stage,
+        blockers: state.enemies,
+      })
+      if (state.player.state === 'skill' && moved) state.player.state = 'walk'
+      else if (state.player.state === 'walk' && !moved) state.player.state = 'skill'
     }
 
     this.stepEnemies(deltaMs)

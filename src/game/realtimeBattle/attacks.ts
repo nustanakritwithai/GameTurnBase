@@ -105,6 +105,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     knockback: 60,
     hitstunMs: 200,
     lungeDistance: 32,
+    multiTarget: true,
   },
   {
     id: 'monkey-attack-2',
@@ -121,6 +122,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     depthTolerance: 100,
     knockback: 80,
     lungeDistance: 36,
+    multiTarget: true,
   },
   {
     id: 'monkey-attack-3',
@@ -141,6 +143,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     knockdown: true,
     hitstunMs: 200,
     lungeDistance: 44,
+    multiTarget: true,
   },
 ]
 
@@ -177,6 +180,7 @@ export const MONKEY_SPINNING_STAFF: AttackDefinition = {
   arcDegrees: 360,
   depthTolerance: 0,
   knockback: 140,
+  multiTarget: true,
 }
 
 /** สกิล 2 — พุ่งไม้เท้าแนวนอน (placeholder content, P3 framework) */
@@ -194,6 +198,7 @@ export const MONKEY_STAFF_THRUST: AttackDefinition = {
   arcDegrees: 0,
   depthTolerance: 92,
   knockback: 120,
+  castDelayMs: 250,
 }
 
 /** สกิล 3 — กวาดไม้กว้าง (placeholder content, P3 framework) */
@@ -211,6 +216,7 @@ export const MONKEY_STAFF_SWEEP: AttackDefinition = {
   arcDegrees: 0,
   depthTolerance: 110,
   knockback: 160,
+  castDelayMs: 320,
 }
 
 /**
@@ -234,6 +240,8 @@ export const MONKEY_GOLDEN_FURY: AttackDefinition = {
   depthTolerance: 0,
   knockback: 200,
   targetLock: 'nearest',
+  castDelayMs: 480,
+  multiTarget: false,
   interruptible: false,
   phaseOverrides: {
     telegraph: { interruptible: false },

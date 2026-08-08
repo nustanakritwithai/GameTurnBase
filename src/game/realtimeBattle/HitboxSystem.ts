@@ -80,6 +80,51 @@ function hitsRadial(
   return cosAngle >= halfArcCos
 }
 
+function passesHitGeometry(
+  attacker: RealtimeBattleEntity,
+  attack: AttackDefinition,
+  target: RealtimeBattleEntity,
+): boolean {
+  if (attack.hitShape === 'horizontal') {
+    return hitsHorizontal(attacker, attack, target)
+  }
+  return hitsRadial(attacker, attack, target)
+}
+
+function pickNearestTarget(
+  attacker: RealtimeBattleEntity,
+  candidates: RealtimeBattleEntity[],
+): RealtimeBattleEntity | null {
+  let nearest: RealtimeBattleEntity | null = null
+  let nearestDistSq = Number.POSITIVE_INFINITY
+  for (const target of candidates) {
+    const dx = target.position.x - attacker.position.x
+    const dy = target.position.y - attacker.position.y
+    const distSq = dx * dx + dy * dy
+    if (distSq < nearestDistSq) {
+      nearestDistSq = distSq
+      nearest = target
+    }
+  }
+  return nearest
+}
+
+function filterValidTargets(
+  targets: RealtimeBattleEntity[],
+  attacker: RealtimeBattleEntity,
+  attack: AttackDefinition,
+  alreadyHit: ReadonlySet<string>,
+  elapsedMs: number,
+): RealtimeBattleEntity[] {
+  return targets.filter((target) => {
+    if (target.id === attacker.id) return false
+    if (target.state === 'dead' || target.hp <= 0) return false
+    if (alreadyHit.has(target.id)) return false
+    if (target.invulnerableUntilMs > elapsedMs) return false
+    return passesHitGeometry(attacker, attack, target)
+  })
+}
+
 /**
  * คืนรายชื่อหน่วยที่โดนท่านี้ในเฟรมนี้
  */
@@ -100,16 +145,12 @@ export function findHitTargets(
     return [target]
   }
 
-  return targets.filter((target) => {
-    if (target.id === attacker.id) return false
-    if (target.state === 'dead' || target.hp <= 0) return false
-    if (alreadyHit.has(target.id)) return false
-    if (target.invulnerableUntilMs > elapsedMs) return false
+  const inGeometry = filterValidTargets(targets, attacker, attack, alreadyHit, elapsedMs)
 
-    if (attack.hitShape === 'horizontal') {
-      return hitsHorizontal(attacker, attack, target)
-    }
+  if (attack.multiTarget === false) {
+    const nearest = pickNearestTarget(attacker, inGeometry)
+    return nearest ? [nearest] : []
+  }
 
-    return hitsRadial(attacker, attack, target)
-  })
+  return inGeometry
 }

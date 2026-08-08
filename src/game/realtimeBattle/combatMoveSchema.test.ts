@@ -10,6 +10,7 @@ import {
   resolveHitstunMs,
   resolveInterruptible,
   resolveTelegraphMs,
+  allowsMovementDuringCast,
 } from './combatMoveSchema'
 
 describe('combatMoveSchema', () => {
@@ -53,5 +54,27 @@ describe('combatMoveSchema', () => {
 
   it('total duration includes telegraph', () => {
     expect(attackTotalDurationMs(ENEMY_ATTACK_MELEE)).toBe(280 + 120 + 140 + 420)
+  })
+
+  it('castDelayMs adds wind-up phase before startup (§3.6.12)', () => {
+    const attack = {
+      ...PLAYER_ATTACK_CHAIN[0],
+      castDelayMs: 250,
+      startupMs: 100,
+      activeMs: 50,
+      recoveryMs: 50,
+    }
+    expect(getMovePhase(attack, 249)).toBe('castDelay')
+    expect(getMovePhase(attack, 250)).toBe('startup')
+    expect(getMovePhase(attack, 349)).toBe('startup')
+    expect(getMovePhase(attack, 350)).toBe('active')
+    expect(attackTotalDurationMs(attack)).toBe(250 + 100 + 50 + 50)
+  })
+
+  it('movementDuringCast defaults to locked (§3.6.12 none)', () => {
+    expect(allowsMovementDuringCast(PLAYER_ATTACK_CHAIN[0])).toBe(false)
+    expect(allowsMovementDuringCast({ ...PLAYER_ATTACK_CHAIN[0], movementDuringCast: true })).toBe(
+      true,
+    )
   })
 })

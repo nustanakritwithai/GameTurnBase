@@ -10,7 +10,7 @@ export const COMBAT_DEFAULTS = {
   softTargetAssistRange: 220,
 } as const
 
-export type MovePhase = 'telegraph' | 'startup' | 'active' | 'recovery'
+export type MovePhase = 'telegraph' | 'castDelay' | 'startup' | 'active' | 'recovery'
 
 export interface PhaseOverride {
   interruptible?: boolean
@@ -20,6 +20,16 @@ export type MovePhaseOverrides = Partial<Record<MovePhase, PhaseOverride>>
 
 export function resolveTelegraphMs(attack: AttackDefinition): number {
   return attack.telegraphMs ?? 0
+}
+
+/** Wind-up before startup/active — skills only; basic attacks omit (§3.6.12). */
+export function resolveCastDelayMs(attack: AttackDefinition): number {
+  return attack.castDelayMs ?? 0
+}
+
+/** Whether the player may receive movement input while this move is executing. */
+export function allowsMovementDuringCast(attack: AttackDefinition): boolean {
+  return attack.movementDuringCast === true
 }
 
 export function resolveHitstunMs(attack: AttackDefinition): number {
@@ -35,7 +45,13 @@ export function resolveGetUpMs(attack: AttackDefinition): number {
 }
 
 export function attackTotalDurationMs(attack: AttackDefinition): number {
-  return resolveTelegraphMs(attack) + attack.startupMs + attack.activeMs + attack.recoveryMs
+  return (
+    resolveTelegraphMs(attack) +
+    resolveCastDelayMs(attack) +
+    attack.startupMs +
+    attack.activeMs +
+    attack.recoveryMs
+  )
 }
 
 /** Elapsed ms within the execute block (startup → active → recovery), after telegraph. */
@@ -55,7 +71,10 @@ export function getExecutePhase(
 export function getMovePhase(attack: AttackDefinition, elapsedMs: number): MovePhase | 'complete' {
   const telegraph = resolveTelegraphMs(attack)
   if (elapsedMs < telegraph) return 'telegraph'
-  return getExecutePhase(attack, elapsedMs - telegraph)
+  const afterTelegraph = elapsedMs - telegraph
+  const castDelay = resolveCastDelayMs(attack)
+  if (afterTelegraph < castDelay) return 'castDelay'
+  return getExecutePhase(attack, afterTelegraph - castDelay)
 }
 
 export function isExecuteActiveWindow(attack: AttackDefinition, executeElapsedMs: number): boolean {

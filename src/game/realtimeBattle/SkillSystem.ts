@@ -135,7 +135,8 @@ export function stepSkill(
 
   player.state = 'skill'
   const telegraph = attack.telegraphMs ?? 0
-  const executeElapsed = Math.max(0, skill.sinceStartMs - telegraph)
+  const castDelay = attack.castDelayMs ?? 0
+  const executeElapsed = Math.max(0, skill.sinceStartMs - telegraph - castDelay)
   const strikeIndex = getStrikeIndex(attack, executeElapsed)
 
   return {

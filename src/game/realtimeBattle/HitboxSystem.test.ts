@@ -298,3 +298,42 @@ describe('findHitTargets — targetLock: nearest (ระบบ #8 Skill-Targetin
     expect(hits).toHaveLength(0)
   })
 })
+
+describe('findHitTargets — multiTarget (Hero Kit §3.6.7)', () => {
+  it('multiTarget: true โจมตีทุกเป้าใน geometry', () => {
+    const near = entity({ id: 'near', position: { x: 80, y: 0 } })
+    const far = entity({ id: 'far', position: { x: 100, y: 0 } })
+    const sweep = { ...PLAYER_ATTACK, multiTarget: true }
+    const hits = findHitTargets([near, far], query({ attack: sweep }))
+    expect(hits.map((t) => t.id).toSorted()).toEqual(['far', 'near'])
+  })
+
+  it('multiTarget: false โจมตีเป้าใกล้สุดตัวเดียว', () => {
+    const near = entity({ id: 'near', position: { x: 80, y: 0 } })
+    const far = entity({ id: 'far', position: { x: 100, y: 0 } })
+    const single = { ...PLAYER_ATTACK, multiTarget: false }
+    const hits = findHitTargets([near, far], query({ attack: single }))
+    expect(hits.map((t) => t.id)).toEqual(['near'])
+  })
+
+  it('multiTarget: undefined รักษา sweep เดิม (backward compatible)', () => {
+    const near = entity({ id: 'near', position: { x: 80, y: 0 } })
+    const far = entity({ id: 'far', position: { x: 100, y: 0 } })
+    const legacy = { ...PLAYER_ATTACK, multiTarget: undefined }
+    const hits = findHitTargets([near, far], query({ attack: legacy }))
+    expect(hits).toHaveLength(2)
+  })
+
+  it('MONKEY_GOLDEN_FURY multiTarget: false + targetLock = เป้าเดียว', () => {
+    const locked = entity({ id: 'locked', position: { x: 100, y: 0 } })
+    const closer = entity({ id: 'closer', position: { x: 40, y: 0 } })
+    const hits = findHitTargets([locked, closer], {
+      attacker: attacker(),
+      attack: { ...PLAYER_ATTACK, targetLock: 'nearest', multiTarget: false },
+      alreadyHit: new Set(),
+      elapsedMs: 1000,
+      lockedTargetId: 'locked',
+    })
+    expect(hits.map((t) => t.id)).toEqual(['locked'])
+  })
+})

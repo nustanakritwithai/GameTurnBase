@@ -42,10 +42,9 @@ function nonTestNonAttacksFiles(sources: Record<string, string>): [string, strin
 
 // Done-criterion #2 anchor: ฟิลด์ที่ "shipped" วันนี้ (required เสมอ + optional ที่มี
 // consumer จริงแล้ว — เช่น targetLock ของระบบ #8 Skill-Targeting, ดู HitboxSystem.ts/
-// SkillSystem.ts). ฟิลด์ใหม่จาก §3.6.7 ที่ยังไม่มี consumer (castDelayMs, interruptible,
-// movementDuringCast, lungeDistance, hitstunMs, knockdown, multiTarget, effects[]) ต้องมากับ
-// PR ของ consumer ที่อ่านมัน — ถ้าเทสต์นี้ fail เพราะมีฟิลด์ใหม่โผล่ ให้เช็คว่ามี consumer
-// มาด้วยจริงไหมก่อนอัปเดตรายการนี้
+// SkillSystem.ts / HitboxSystem.ts). ฟิลด์ใหม่จาก §3.6.7 ที่ยังไม่มี consumer (interruptible,
+// lungeDistance, hitstunMs, knockdown, effects[]) ต้องมากับ PR ของ consumer ที่อ่านมัน —
+// castDelayMs / movementDuringCast / multiTarget shipped with SkillSystem + HitboxSystem consumers (PR #61 follow-up).
 const REQUIRED_FIELDS = [
   'id',
   'animationId',
@@ -79,6 +78,10 @@ const OPTIONAL_FIELDS = [
   'interruptible',
   'phaseOverrides',
   'strikeCount',
+  // Hero Kit + Skill/Cast + Hitbox consumers (§3.6.12 baseline, PR #61 follow-up)
+  'castDelayMs',
+  'movementDuringCast',
+  'multiTarget',
 ] as const
 const KNOWN_FIELDS: readonly string[] = [...REQUIRED_FIELDS, ...OPTIONAL_FIELDS]
 
