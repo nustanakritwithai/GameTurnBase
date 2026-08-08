@@ -2,67 +2,32 @@
 
 > **Upstream (product repo):** [KatomnoiStudio/LegendOfSoulTH](https://github.com/KatomnoiStudio/LegendOfSoulTH)  
 > **Live play:** https://katomnoistudio.github.io/LegendOfSoulTH/  
-> **Operator:** HetCreep · **Last synced:** 2026-08-07
+> **Operator:** HetCreep · **Last synced:** 2026-08-08
 
 Fork นี้เป็น **staging branch holder** สำหรับ Cursor Cloud Agent — delivery จริงคือ upstream PR บน `KatomnoiStudio/LegendOfSoulTH` (ดู `.agents/rules/upstream-submission-workflow.md`)
 
 ---
 
-## Active delivery chain (merge ตามลำดับ)
+## Delivery chain — **CLOSED (all landed upstream 2026-08-08)**
 
-| #   | Version     | Topic                                | Fork PR                                                          | Upstream PR                                                     | Branch                                 |
-| --- | ----------- | ------------------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------- |
-| 1   | v0.10.0     | P5 Dungeon vertical slice            | [#65](https://github.com/nustanakritwithai/GameTurnBase/pull/65) | [#30](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/30) | `cursor/p5-dungeon-slice-35fc`         |
-| 2   | v0.11.0     | Result / Reward pipeline             | [#66](https://github.com/nustanakritwithai/GameTurnBase/pull/66) | [#31](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/31) | `cursor/result-reward-pipeline-35fc`   |
-| 3   | v0.11.1     | Camera +30% height + sprite tilt fix | [#67](https://github.com/nustanakritwithai/GameTurnBase/pull/67) | [#32](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/32) | `cursor/camera-height-tilt-fix-35fc`   |
-| 4   | **v0.12.0** | **P8 Character Progression**         | [#68](https://github.com/nustanakritwithai/GameTurnBase/pull/68) | [#33](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/33) | `cursor/p8-character-progression-35fc` |
+| #   | Version | Topic                     | Fork PR                                                          | Upstream PR                                                     | สถานะ                           |
+| --- | ------- | ------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------- |
+| 1   | v0.10.0 | P5 Dungeon vertical slice | [#65](https://github.com/nustanakritwithai/GameTurnBase/pull/65) | [#30](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/30) | **Merged upstream**             |
+| 2   | v0.11.0 | Result / Reward pipeline  | [#66](https://github.com/nustanakritwithai/GameTurnBase/pull/66) | [#31](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/31) | **Merged upstream**             |
+| 3   | v0.11.1 | Camera +30% height fix    | [#67](https://github.com/nustanakritwithai/GameTurnBase/pull/67) | [#32](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/32) | **Merged upstream**             |
+| 4   | v0.12.0 | P8 Character Progression  | [#68](https://github.com/nustanakritwithai/GameTurnBase/pull/68) | [#33](https://github.com/KatomnoiStudio/LegendOfSoulTH/pull/33) | **Merged upstream** (`d54eee2`) |
 
-**ล่าสุด (P8):** per-hero level/EXP · skill upgrade · talent/awakening foundation · reward pipeline integration · combat snapshot · save migration · roster UI (`พัฒนา` tab) · 314 tests CI green
-
----
-
-## P8 Character Progression (v0.12.0) — summary
-
-**Flow:** `RewardGrant → ProgressionService.applyHeroExp() → Hero Progress State → resolveFinalCombatStats → Combat Snapshot → Save`
-
-| Pillar                               | Status                                      |
-| ------------------------------------ | ------------------------------------------- |
-| Hero Level / EXP (per-hero)          | ✅                                          |
-| Skill levels per slot (S1/S2/S3/ULT) | ✅                                          |
-| Talent foundation                    | ✅ (test nodes)                             |
-| Awakening foundation                 | ✅ (test tiers)                             |
-| Reward pipeline integration          | ✅                                          |
-| Save / migration                     | ✅                                          |
-| Multi-hero isolation                 | ✅ tested                                   |
-| Progression UI                       | ✅ `HeroProgressionPanel`                   |
-| Final balance numerics               | ⏳ Ring 0 TBD (NON-PRODUCTION placeholders) |
-
-**Module:** `src/game/progression/`  
-**Exit gate:** PASS
+Fork PRs #65–#68 ปิดแล้ว (superseded) — โค้ดจริงอยู่บน upstream `master` @ **v0.12.0**.
 
 ---
 
 ## Active branches (remote)
 
-หลังทำความสะอาด 2026-08-07 เหลือเฉพาะ:
+หลังเก็บกวาด 2026-08-08 เหลือเฉพาะ:
 
-- `master`
-- `cursor/p5-dungeon-slice-35fc`
-- `cursor/result-reward-pipeline-35fc`
-- `cursor/camera-height-tilt-fix-35fc`
-- `cursor/p8-character-progression-35fc`
+- `master` — sync กับ upstream `master` (v0.12.0)
 
-กิ่งเก่าที่ merge แล้ว / superseded (PR #57–#64 และงานก่อน P5 chain) ถูกลบจาก remote แล้ว
-
----
-
-## Closed / historical (archived)
-
-| Fork PR | Topic                         | สถานะ                                  |
-| ------- | ----------------------------- | -------------------------------------- |
-| #64     | P4 Combat Core v0.9.0         | ปิด — superseded (upstream #29 merged) |
-| #61–#63 | Mobile UI / camera iterations | ปิด — superseded by #67 chain          |
-| #57–#60 | Docs / P4 AI                  | ปิด — merged หรือ obsolete             |
+กิ่ง `cursor/*-35fc` ถูกลบจาก fork remote แล้ว (งาน merge ครบ)
 
 ---
 
@@ -70,11 +35,11 @@ Fork นี้เป็น **staging branch holder** สำหรับ Cursor C
 
 - **Rules:** [`AGENTS.md`](../AGENTS.md) · **State journal:** [`MEMORY.md`](../MEMORY.md)
 - **Blueprint:** [`docs/MASTER_BLUEPRINT_v3.0.md`](MASTER_BLUEPRINT_v3.0.md)
-- **Changelog:** [`CHANGELOG.md`](../CHANGELOG.md) — latest unreleased entry on feature branches through v0.12.0
+- **Changelog:** [`CHANGELOG.md`](../CHANGELOG.md)
 
 ---
 
 ## หมายเหตุ
 
-- Fork `master` อาจอยู่หลัง feature branches — โค้ดล่าสุดอยู่บน branch ในตารางด้านบน
-- Upstream deploy ผูก `GAME_INFO.version` — ปล่อยเว็จริงเมื่อ upstream merge + bump แล้วเท่านั้น
+- Upstream deploy ผูก `GAME_INFO.version` — live ที่ https://katomnoistudio.github.io/LegendOfSoulTH/
+- P8 balance numerics ยัง NON-PRODUCTION — รอ Ring 0 lock (ดู `MEMORY.md` item 119)

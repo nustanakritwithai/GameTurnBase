@@ -10,8 +10,9 @@ import {
 import { resolveRewards } from './rewardResolver'
 import { getDungeonRewardDefinition } from './rewardConfig'
 import { grantDungeonRewards } from './rewardGrantService'
-import { resolveDungeonRewards } from './dungeonRewardPipeline'
+import { resolveDungeonRewards, grantAndFinalizeDungeonRewards } from './dungeonRewardPipeline'
 import { buildResultViewModel } from './resultViewModel'
+import { buildHeroProgressionViewModel } from '../progression/progressionViewModel'
 import type { GoldSource } from '../../data/accountRepository'
 import type { Player } from '../../types/player'
 import { EMPTY_PROGRESS } from '../../types/player'
@@ -303,5 +304,115 @@ describe('retry runId', () => {
     const runB = createRunId('p5-test-dungeon', 200)
     expect(`${runA}:final`).not.toBe(`${runB}:final`)
     expect(hasRewardTransaction({ [`reward_tx_${runA}:final`]: true }, `${runA}:final`)).toBe(true)
+  })
+})
+
+/**
+ * E2E ของ flow จริงหลังดันเจี้ยนจบ (ข้าม combat) — จำลองสิ่งที่ DungeonSession.handleContinue ทำ:
+ * resolve rewards → grant + heroExp → buildHeroProgressionViewModel สำหรับแท็บ พัฒนา
+ */
+function makeGrantDeps(initial: Player) {
+  let current = initial
+  return {
+    onEarnGold: async (_source: GoldSource, amount: number) => {
+      current = {
+        ...current,
+        currency: { ...current.currency, gold: current.currency.gold + amount },
+      }
+      return { ok: true as const, player: current, amount }
+    },
+    onGrantItem: async (itemId: string, quantity: number) => {
+      const existing = current.inventory.find((e) => e.itemId === itemId)
+      const inventory = existing
+        ? current.inventory.map((e) =>
+            e.itemId === itemId ? { ...e, quantity: e.quantity + quantity } : e,
+          )
+        : [
+            ...current.inventory,
+            {
+              itemId,
+              quantity,
+              obtainedAt: new Date().toISOString(),
+              obtainedFrom: 'drop',
+            },
+          ]
+      current = { ...current, inventory }
+      return { ok: true as const, player: current }
+    },
+  }
+}
+
+describe('dungeon clear → heroExp → พัฒนา view model (E2E pipeline)', () => {
+  it('result screen แสดง Hero EXP +45 แล้ว lead hero ได้ EXP ตรงใน view model', async () => {
+    const player = stubPlayer()
+    const beforeVm = buildHeroProgressionViewModel(player, 'monkey-king')
+    expect(beforeVm).not.toBeNull()
+    expect(beforeVm!.currentExp).toBe(0)
+    expect(beforeVm!.expToNext).toBe(100)
+    expect(beforeVm!.level).toBe(1)
+
+    const result = dungeonResult({ runId: 'e2e-hero-exp-run' })
+    const presentation = resolveDungeonRewards(
+      result,
+      P5_TEST_DUNGEON,
+      player.progress.flags,
+      () => 0.99,
+    )
+    const heroExpLine = presentation.viewModel.rewards.find((r) => r.label === 'Hero EXP')
+    expect(heroExpLine).toEqual({ kind: 'heroExp', label: 'Hero EXP', amount: '+45' })
+
+    const pipeline = await grantAndFinalizeDungeonRewards({
+      result,
+      dungeon: P5_TEST_DUNGEON,
+      player,
+      deps: makeGrantDeps(player),
+      rng: () => 0.99,
+    })
+    expect(pipeline.grant.success).toBe(true)
+    expect(pipeline.grant.playerUpdated).toBe(true)
+
+    const afterVm = buildHeroProgressionViewModel(pipeline.player, 'monkey-king')
+    expect(afterVm).not.toBeNull()
+    expect(afterVm!.currentExp).toBe(45)
+    expect(afterVm!.level).toBe(1)
+    expect(afterVm!.expToNext).toBe(100)
+    expect(afterVm!.currentExp - beforeVm!.currentExp).toBe(45)
+  })
+
+  it('heroExp ไปที่ lead hero (teamSlots[0]) ไม่ใช่ตัวอื่นใน roster', async () => {
+    const player = stubPlayer({
+      ownedCharacters: [
+        {
+          characterId: 'pig-warrior',
+          level: 1,
+          exp: 0,
+          expToNext: 100,
+          obtainedAt: new Date().toISOString(),
+          skillLevels: createDefaultSkillLevels(),
+        },
+        {
+          characterId: 'monkey-king',
+          level: 1,
+          exp: 0,
+          expToNext: 100,
+          obtainedAt: new Date().toISOString(),
+          skillLevels: createDefaultSkillLevels(),
+        },
+      ],
+      teamSlots: ['pig-warrior', 'monkey-king', null, null],
+    })
+    const result = dungeonResult({ runId: 'e2e-lead-pig-run' })
+    const pipeline = await grantAndFinalizeDungeonRewards({
+      result,
+      dungeon: P5_TEST_DUNGEON,
+      player,
+      deps: makeGrantDeps(player),
+      rng: () => 0.99,
+    })
+
+    const pig = pipeline.player.ownedCharacters.find((c) => c.characterId === 'pig-warrior')
+    const monkey = pipeline.player.ownedCharacters.find((c) => c.characterId === 'monkey-king')
+    expect(pig?.exp).toBe(45)
+    expect(monkey?.exp).toBe(0)
   })
 })
