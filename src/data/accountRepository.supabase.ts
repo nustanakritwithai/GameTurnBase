@@ -4,6 +4,7 @@ import { TEAM_SIZE } from '../game/team'
 import { migrateOwnedCharacters } from '../game/progression/progressionMigration'
 import { mapOwnedCharacterRow } from './accountRepository.supabase.mapping'
 import { EMPTY_PROGRESS, type FriendCandidate, type Player } from '../types/player'
+import type { RealtimeBattleResult } from '../game/realtimeBattle/types'
 import {
   GEM_PACKAGES,
   GOLD_PACKAGES,
@@ -429,16 +430,132 @@ export async function getTransactions(uid: string): Promise<CurrencyTransaction[
   }))
 }
 
+export interface PendingLobbyRewardRow {
+  transactionId: string
+  stageId: string
+  stageName: string
+  outcome: 'victory' | 'defeat'
+  earnedExp: number
+  earnedGold: number
+  droppedItems: Array<{ itemId: string; quantity: number }>
+  finishedAt: string
+  durationMs?: number | null
+}
+
+export interface LobbyBattleProgressionRpcPayload {
+  transactionId: string
+  player: Player
+  leadCharacterId: string
+  battle: {
+    externalId: string
+    opponent: string
+    result: 'win' | 'lose'
+    durationMs: number
+    finishedAt: string
+  }
+}
+
+export async function commitLobbyBattleProgression(
+  payload: LobbyBattleProgressionRpcPayload,
+): Promise<{ ok: true; player: Player } | { ok: false; error: string }> {
+  const lead = payload.player.ownedCharacters.find(
+    (owned) => owned.characterId === payload.leadCharacterId,
+  )
+  if (!lead) {
+    return { ok: false, error: 'ไม่พบตัวละครขุนพลสำหรับบันทึกความคืบหน้า' }
+  }
+
+  const { data, error } = await supabase.rpc('commit_lobby_battle_progression', {
+    p_transaction_id: payload.transactionId,
+    p_name: payload.player.name,
+    p_title: payload.player.title,
+    p_profile_level: payload.player.level,
+    p_profile_exp: payload.player.exp,
+    p_profile_exp_to_next: payload.player.expToNext,
+    p_frame_id: payload.player.frameId,
+    p_flags: payload.player.progress.flags,
+    p_defeated_npc_ids: payload.player.progress.defeatedNpcIds,
+    p_lead_character_id: payload.leadCharacterId,
+    p_hero_level: lead.level,
+    p_hero_exp: lead.exp,
+    p_hero_exp_to_next: lead.expToNext,
+    p_skill_levels: lead.skillLevels,
+    p_talent_state: lead.talentState ?? { unlockedNodes: [] },
+    p_awakening_state: lead.awakeningState ?? { tier: 0, unlockedEffects: [] },
+    p_battle_external_id: payload.battle.externalId,
+    p_opponent: payload.battle.opponent,
+    p_battle_result: payload.battle.result,
+    p_duration_ms: payload.battle.durationMs,
+    p_finished_at: payload.battle.finishedAt,
+  })
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'บันทึกความคืบหน้าไม่สำเร็จ' }
+  }
+
+  const player = await loadPlayer(data.id)
+  if (!player) return { ok: false, error: 'บันทึกความคืบหน้าไม่สำเร็จ' }
+  return { ok: true, player }
+}
+
+export async function upsertPendingLobbyReward(
+  result: RealtimeBattleResult,
+  transactionId: string,
+): Promise<boolean> {
+  const { error } = await supabase.rpc('upsert_pending_lobby_reward', {
+    p_transaction_id: transactionId,
+    p_stage_id: result.stageId,
+    p_stage_name: result.stageName,
+    p_outcome: result.outcome,
+    p_earned_exp: result.earnedExp,
+    p_earned_gold: result.earnedGold,
+    p_dropped_items: result.droppedItems,
+    p_finished_at: result.finishedAt,
+    p_duration_ms: result.elapsedMs,
+  })
+  return !error
+}
+
+export async function clearPendingLobbyReward(transactionId: string): Promise<void> {
+  await supabase.rpc('clear_pending_lobby_reward', { p_transaction_id: transactionId })
+}
+
+export async function getPendingLobbyRewards(): Promise<PendingLobbyRewardRow[]> {
+  const { data: session } = await supabase.auth.getSession()
+  const userId = session.session?.user.id
+  if (!userId) return []
+
+  const { data } = await supabase
+    .from('pending_lobby_rewards')
+    .select('*')
+    .eq('profile_id', userId)
+    .order('created_at')
+
+  return (data ?? []).map((row) => ({
+    transactionId: row.transaction_id,
+    stageId: row.stage_id,
+    stageName: row.stage_name,
+    outcome: row.outcome as 'victory' | 'defeat',
+    earnedExp: row.earned_exp,
+    earnedGold: row.earned_gold,
+    droppedItems: (row.dropped_items ?? []) as Array<{ itemId: string; quantity: number }>,
+    finishedAt: row.finished_at,
+    durationMs: row.duration_ms,
+  }))
+}
+
 export async function grantItem(
   _uid: string,
   itemId: string,
   quantity: number,
   source: ItemSource,
+  refId?: string,
 ): Promise<ItemResult> {
   const { data, error } = await supabase.rpc('grant_item', {
     p_item_id: itemId,
     p_quantity: quantity,
     p_source: source,
+    p_ref_id: refId ?? null,
   })
   if (error || !data) return { ok: false, error: error?.message ?? 'บันทึกข้อมูลไม่สำเร็จ' }
   const player = await loadPlayer(data.id)

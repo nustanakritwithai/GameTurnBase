@@ -10,6 +10,11 @@ import { EMPTY_PROGRESS } from '../../types/player'
  */
 
 describe('StageSelect', () => {
+  it('ไม่แสดงสนามทดสอบ dungeon-p5-test', () => {
+    render(<StageSelect progress={EMPTY_PROGRESS} onSelect={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /ดันเจี้ยนทดสอบ/ })).not.toBeInTheDocument()
+  })
+
   it('ด่านแรกกดได้ ด่านถัดไปที่ยังไม่ปลดล็อกกดไม่ได้ (disabled)', () => {
     render(<StageSelect progress={EMPTY_PROGRESS} onSelect={vi.fn()} onClose={vi.fn()} />)
 
@@ -40,7 +45,7 @@ describe('StageSelect', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('เคลียร์ด่านแรกแล้ว ด่านบอสถัดไปปลดล็อกและกดได้', () => {
+  it('เคลียร์ด่านแรกแล้ว ด่านถัดไปปลดล็อกและกดได้', () => {
     const cleared = { ...EMPTY_PROGRESS, flags: { 'trial_cleared_trial-01': true } }
     render(<StageSelect progress={cleared} onSelect={vi.fn()} onClose={vi.fn()} />)
 

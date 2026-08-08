@@ -1,4 +1,5 @@
 import { getCharacter } from '../game/characters'
+import { createDefaultEnergy, normalizeEnergy } from '../game/adventure/energySystem'
 import { GAME_INFO } from '../game/gameInfo'
 import { getItem } from '../game/items'
 import { generateUid } from '../game/uid'
@@ -309,7 +310,10 @@ function normalizePlayer(player: Player): Player {
 
   return {
     ...player,
-    progress: player.progress ?? EMPTY_PROGRESS,
+    progress: {
+      ...(player.progress ?? EMPTY_PROGRESS),
+      energy: normalizeEnergy(player.progress?.energy),
+    },
     inventory: player.inventory ?? [],
     friends: player.friends ?? [],
     ownedCharacters: migrateOwnedCharacters(
@@ -350,7 +354,7 @@ function createNewPlayer(uid: string): Player {
     inventory: [],
     friends: [],
     frameId: 'arcane',
-    progress: { ...EMPTY_PROGRESS },
+    progress: { ...EMPTY_PROGRESS, energy: createDefaultEnergy() },
   }
 }
 
@@ -704,6 +708,7 @@ export async function grantItem(
   itemId: string,
   quantity: number,
   source: ItemSource,
+  _refId?: string,
 ): Promise<ItemResult> {
   if (!getItem(itemId)) return { ok: false, error: 'ไม่พบไอเทมนี้' }
   if (!Number.isInteger(quantity) || quantity <= 0) {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useRealtimeBattle } from '../../hooks/useRealtimeBattle'
 import type { RealtimeBattleResult } from '../../game/realtimeBattle/types'
 import type { Player } from '../../types/player'
@@ -22,6 +22,8 @@ interface BattleSceneProps {
 
 export function BattleScene({ player, stageId, onComplete, onExit }: BattleSceneProps) {
   const [pendingResult, setPendingResult] = useState<RealtimeBattleResult | null>(null)
+  /** กันปุ่ม "กลับล็อบบี้" / Escape ยิง onComplete ซ้ำก่อน async บันทึกเสร็จ */
+  const continuingRef = useRef(false)
 
   const {
     phase,
@@ -45,7 +47,8 @@ export function BattleScene({ player, stageId, onComplete, onExit }: BattleScene
   }, [onExit, requestExit])
 
   const handleContinue = useCallback(() => {
-    if (!pendingResult) return
+    if (!pendingResult || continuingRef.current) return
+    continuingRef.current = true
     onComplete(pendingResult)
   }, [onComplete, pendingResult])
 
