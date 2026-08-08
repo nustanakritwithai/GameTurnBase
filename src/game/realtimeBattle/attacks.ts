@@ -58,6 +58,11 @@ export interface AttackDefinition {
    * ไม่ใส่ = ท่าปกติ ไม่ทำ knockdown (พฤติกรรมเดิม)
    */
   knockdown?: boolean
+  /**
+   * ระยะทางพุ่งตัวละครไปข้างหน้า (§3.6.2/§3.6.11) ระหว่างช่วง startupMs
+   * ไม่ใส่ = ไม่พุ่ง (พฤติกรรมเดิม)
+   */
+  lungeDistance?: number
 
   /** Wind-up before startup — enemy telegraph (ms). Default 0 for player attacks. */
   telegraphMs?: number
@@ -71,6 +76,10 @@ export interface AttackDefinition {
   phaseOverrides?: MovePhaseOverrides
   /** Multi-hit active window slices (ultimate). */
   strikeCount?: number
+  /** Hero Kit missing fields per Done-criterion #1 */
+  castDelayMs?: number
+  movementDuringCast?: boolean
+  multiTarget?: boolean
 }
 
 /**
@@ -95,6 +104,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     depthTolerance: 95,
     knockback: 60,
     hitstunMs: 200,
+    lungeDistance: 32,
   },
   {
     id: 'monkey-attack-2',
@@ -110,6 +120,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     arcDegrees: 0,
     depthTolerance: 100,
     knockback: 80,
+    lungeDistance: 36,
   },
   {
     id: 'monkey-attack-3',
@@ -129,6 +140,7 @@ export const PLAYER_ATTACK_CHAIN: AttackDefinition[] = [
     // ไม้จบคอมโบ = combo finisher ตาม §3.6.12 (knockdown เฉพาะเป้าหมาย elite/boss เท่านั้น)
     knockdown: true,
     hitstunMs: 200,
+    lungeDistance: 44,
   },
 ]
 
@@ -283,6 +295,46 @@ export const ENEMY_ATTACK_ELITE: AttackDefinition = {
 
 /** @deprecated Use ENEMY_ATTACK_MELEE — kept for imports */
 export const ENEMY_ATTACK = ENEMY_ATTACK_MELEE
+
+/** Boss attack rows — telegraphMs 800–1200ms baseline (§3.6.12) */
+export const SPIRIT_GUARDIAN_BOSS_PHASE_1_ATTACKS: AttackDefinition[] = [
+  {
+    ...ENEMY_ATTACK_MELEE,
+    id: 'sgb-phase1-strike',
+    telegraphMs: 900,
+    damageMultiplier: 1.1,
+    range: 118,
+  },
+  {
+    ...ENEMY_ATTACK_MELEE,
+    id: 'sgb-phase1-sweep',
+    telegraphMs: 1000,
+    damageMultiplier: 1.05,
+    range: 130,
+    hitShape: 'radial',
+    arcDegrees: 120,
+  },
+]
+
+export const SPIRIT_GUARDIAN_BOSS_PHASE_2_ATTACKS: AttackDefinition[] = [
+  {
+    ...ENEMY_ATTACK_ELITE,
+    id: 'sgb-phase2-slam',
+    telegraphMs: 850,
+    damageMultiplier: 1.35,
+    range: 128,
+    knockdown: true,
+  },
+  {
+    ...ENEMY_ATTACK_ELITE,
+    id: 'sgb-phase2-burst',
+    telegraphMs: 1100,
+    damageMultiplier: 1.2,
+    range: 140,
+    hitShape: 'radial',
+    arcDegrees: 180,
+  },
+]
 
 export const ENEMY_ATTACKS: Record<string, AttackDefinition> = {
   'enemy-melee': ENEMY_ATTACK_MELEE,

@@ -144,7 +144,7 @@ function readActiveSession(): SessionRecord | null {
 /** ตัวละครที่ได้ฟรีตอนสมัครบัญชีใหม่ */
 const STARTER_CHARACTER_ID = 'monkey-king'
 
-interface StoredAccount {
+export interface StoredAccount {
   uid: string
   email: string
   passwordHash: string
@@ -272,7 +272,7 @@ interface CouponDefinition {
 }
 
 /** โค้ดคูปอง — คีย์เป็นตัวพิมพ์ใหญ่เสมอ (ดู redeemCoupon ที่ normalize ก่อนเทียบ) */
-const COUPONS: Record<string, CouponDefinition> = {
+export const COUPONS: Record<string, CouponDefinition> = {
   WELCOME2026: { gem: 50 },
 }
 

@@ -1,6 +1,7 @@
 import { ENEMY_ATTACK_MELEE } from './attacks'
 import { applyCombatReaction, tickKnockdownState } from './combatReaction'
 import { createWaveEnemies, type RealtimeBattleState } from './createRealtimeBattle'
+import { DEFAULT_BATTLE_PRESENTATION } from './battlePresentation'
 import { resolveStageOutcome } from './StageVariationSystem'
 import { combatFacingFromVector } from './combatFacing'
 import type { RandomFn } from './DamageSystem'
@@ -178,6 +179,41 @@ export class RealtimeBattleRuntime {
     }
 
     const tick = stepCombo(state.player, this.playerCombat, deltaMs)
+
+    // Apply basic attack lunge during the startup phase (§3.6.2/§3.6.11)
+    const attack = this.playerCombat.attack
+    if (attack && attack.lungeDistance && attack.lungeDistance > 0 && attack.startupMs > 0) {
+      const prevSinceStartMs = this.playerCombat.sinceStartMs - deltaMs
+      const currentSinceStartMs = this.playerCombat.sinceStartMs
+
+      const lungeStart = Math.max(0, prevSinceStartMs)
+      const lungeEnd = Math.min(attack.startupMs, currentSinceStartMs)
+      const actualLungeMs = Math.max(0, lungeEnd - lungeStart)
+
+      if (actualLungeMs > 0) {
+        const dir = state.player.facing === 'left' ? -1 : 1
+        const dx = dir * attack.lungeDistance * (actualLungeMs / attack.startupMs)
+        let nextPos = {
+          x: state.player.position.x + dx,
+          y: state.player.position.y,
+        }
+
+        // Collision resolving with living enemies to prevent phasing through them
+        for (const blocker of state.enemies) {
+          if (blocker.state === 'dead') continue
+          nextPos = resolveCircleOverlap(
+            nextPos,
+            state.player.collisionRadius,
+            blocker.position,
+            blocker.collisionRadius,
+          )
+        }
+
+        // Clamp to arena bounds
+        state.player.position = clampToArena(nextPos, state.player.collisionRadius, state.stage)
+      }
+    }
+
     if (!tick.hitboxActive || !tick.attack) return
 
     const targets = findHitTargets(state.enemies, {
@@ -442,13 +478,15 @@ export class RealtimeBattleRuntime {
       for (let j = i + 1; j < alive.length; j += 1) {
         const a = alive[i]
         const b = alive[j]
-        // ดันเฉพาะตัวหลังออกจากตัวหน้า ทำให้ผลลัพธ์ไม่ขึ้นกับลำดับที่วนเจอ
-        b.position = resolveCircleOverlap(
+        // Crowd radius is presentation spacing only. Hitbox/hurtbox/collisionRadius remain unchanged.
+        const crowdMul = DEFAULT_BATTLE_PRESENTATION.enemyCrowdSeparationMul
+        const separated = resolveCircleOverlap(
           b.position,
-          b.collisionRadius,
+          b.collisionRadius * crowdMul,
           a.position,
-          a.collisionRadius,
+          a.collisionRadius * crowdMul,
         )
+        b.position = clampToArena(separated, b.collisionRadius, state.stage)
       }
     }
   }

@@ -105,25 +105,36 @@ export function stepMovement(
     return false
   }
 
-  const deltaSeconds = deltaMs / 1000
+  const maxStepMs = 50
+  let remainingMs = deltaMs
+  let currentPos = { ...entity.position }
+
   entity.velocity = { x: direction.x * entity.speed, y: direction.y * entity.speed }
 
-  let next: Vec2 = {
-    x: entity.position.x + entity.velocity.x * deltaSeconds,
-    y: entity.position.y + entity.velocity.y * deltaSeconds,
+  while (remainingMs > 0) {
+    const stepMs = Math.min(remainingMs, maxStepMs)
+    remainingMs -= stepMs
+
+    const deltaSeconds = stepMs / 1000
+    let next: Vec2 = {
+      x: currentPos.x + entity.velocity.x * deltaSeconds,
+      y: currentPos.y + entity.velocity.y * deltaSeconds,
+    }
+
+    for (const blocker of blockers) {
+      if (blocker.id === entity.id || blocker.state === 'dead') continue
+      next = resolveCircleOverlap(
+        next,
+        entity.collisionRadius,
+        blocker.position,
+        blocker.collisionRadius,
+      )
+    }
+
+    currentPos = clampToArena(next, entity.collisionRadius, stage)
   }
 
-  for (const blocker of blockers) {
-    if (blocker.id === entity.id || blocker.state === 'dead') continue
-    next = resolveCircleOverlap(
-      next,
-      entity.collisionRadius,
-      blocker.position,
-      blocker.collisionRadius,
-    )
-  }
-
-  entity.position = clampToArena(next, entity.collisionRadius, stage)
+  entity.position = currentPos
 
   const facing = directionFromVector(direction)
   if (facing) entity.facing = facing

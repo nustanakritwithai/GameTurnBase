@@ -1,5 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { getSessionPlayer, importSave, login, register, savePlayer } from './accountRepository'
+import {
+  getSessionPlayer,
+  importSave,
+  login,
+  register,
+  savePlayer,
+  COUPONS,
+  earnGold,
+  redeemCoupon,
+  topUpGold,
+  topUpGems,
+  getTransactions,
+  type StoredAccount,
+} from './accountRepository'
 import { GAME_INFO } from '../game/gameInfo'
 
 /*
@@ -229,5 +242,213 @@ describe('session — หมดอายุแบบ sliding window ไม่ใ
     localStorage.setItem('los:session:v1', JSON.stringify(stale))
 
     expect(await getSessionPlayer()).toBeNull()
+  })
+})
+
+describe('Currency System', () => {
+  let uidA = ''
+  let uidB = ''
+
+  beforeEach(async () => {
+    localStorage.clear()
+
+    // สร้าง 2 บัญชีเพื่อใช้ทดสอบ cross-account
+    const regA = await register('currency-a@b.co', 'passw0rd123')
+    const regB = await register('currency-b@b.co', 'passw0rd456')
+
+    if (regA.ok && regB.ok) {
+      // ดึง uid จากบัญชีที่สร้างขึ้นมา
+      const rawA = localStorage.getItem('los:db:v1')
+      if (rawA) {
+        const db = JSON.parse(rawA)
+        const entries = Object.entries(db.accounts || {}) as [string, StoredAccount][]
+        const entA = entries.find(([, acc]) => acc.email === 'currency-a@b.co')
+        const entB = entries.find(([, acc]) => acc.email === 'currency-b@b.co')
+        if (entA) uidA = entA[1].uid
+        if (entB) uidB = entB[1].uid
+      }
+    }
+  })
+
+  afterEach(() => {
+    // ลบคูปองทดสอบหลังเทสแต่ละเคสเสร็จ
+    delete COUPONS.TEST_LIMIT
+    delete COUPONS.TEST_EXPIRED
+  })
+
+  describe('earnGold', () => {
+    test('เพิ่มทองสำเร็จ ยอดทองในตัวเพิ่มขึ้น และบันทึก transaction', async () => {
+      // ดึงข้อมูลผู้เล่นก่อน
+      const db = JSON.parse(localStorage.getItem('los:db:v1') || '{}')
+      const initialGold = db.accounts['currency-a@b.co']?.player.currency.gold || 0
+
+      const result = await earnGold(uidA, 'quest', 500, 'quest-123')
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.player.currency.gold).toBe(initialGold + 500)
+      }
+
+      const txs = await getTransactions(uidA)
+      expect(txs.length).toBe(1)
+      expect(txs[0].currency).toBe('gold')
+      expect(txs[0].source).toBe('quest')
+      expect(txs[0].amount).toBe(500)
+      expect(txs[0].refId).toBe('quest-123')
+    })
+
+    test('ปฏิเสธทองที่จำนวน <= 0 หรือไม่ใช่จำนวนเต็ม', async () => {
+      const resZero = await earnGold(uidA, 'quest', 0)
+      expect(resZero.ok).toBe(false)
+      if (!resZero.ok) {
+        expect(resZero.error).toBe('จำนวนทองไม่ถูกต้อง')
+      }
+
+      const resNegative = await earnGold(uidA, 'quest', -100)
+      expect(resNegative.ok).toBe(false)
+      if (!resNegative.ok) {
+        expect(resNegative.error).toBe('จำนวนทองไม่ถูกต้อง')
+      }
+
+      const resFloat = await earnGold(uidA, 'quest', 50.5)
+      expect(resFloat.ok).toBe(false)
+      if (!resFloat.ok) {
+        expect(resFloat.error).toBe('จำนวนทองไม่ถูกต้อง')
+      }
+    })
+
+    test('ปฏิเสธหากไม่พบ uid ของผู้เล่น', async () => {
+      const result = await earnGold('non-existent-uid', 'quest', 100)
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error).toBe('ไม่พบบัญชีผู้เล่น')
+      }
+    })
+  })
+
+  describe('topUpGold / topUpGems', () => {
+    test('เติมทองสำเร็จตามแพ็กเกจ และบันทึก transaction', async () => {
+      const db = JSON.parse(localStorage.getItem('los:db:v1') || '{}')
+      const initialGold = db.accounts['currency-a@b.co']?.player.currency.gold || 0
+
+      const result = await topUpGold(uidA, 'gold-medium')
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.player.currency.gold).toBe(initialGold + 5500)
+      }
+
+      const txs = await getTransactions(uidA)
+      expect(txs[0].currency).toBe('gold')
+      expect(txs[0].source).toBe('topup')
+      expect(txs[0].amount).toBe(5500)
+      expect(txs[0].refId).toBe('gold-medium')
+    })
+
+    test('เติมหยกสำเร็จตามแพ็กเกจ และบันทึก transaction', async () => {
+      const db = JSON.parse(localStorage.getItem('los:db:v1') || '{}')
+      const initialGems = db.accounts['currency-a@b.co']?.player.currency.gem || 0
+
+      const result = await topUpGems(uidA, 'gem-large')
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.player.currency.gem).toBe(initialGems + 980)
+      }
+
+      const txs = await getTransactions(uidA)
+      expect(txs[0].currency).toBe('gem')
+      expect(txs[0].source).toBe('topup')
+      expect(txs[0].amount).toBe(980)
+      expect(txs[0].refId).toBe('gem-large')
+    })
+
+    test('ปฏิเสธแพ็กเกจเติมเงินที่ไม่ถูกต้อง', async () => {
+      const resGold = await topUpGold(uidA, 'invalid-gold-pack')
+      expect(resGold.ok).toBe(false)
+      if (!resGold.ok) {
+        expect(resGold.error).toBe('ไม่พบแพ็กเกจทองนี้')
+      }
+
+      const resGem = await topUpGems(uidA, 'invalid-gem-pack')
+      expect(resGem.ok).toBe(false)
+      if (!resGem.ok) {
+        expect(resGem.error).toBe('ไม่พบแพ็กเกจหยกนี้')
+      }
+    })
+  })
+
+  describe('redeemCoupon', () => {
+    test('แลกคูปองสำเร็จ ได้หยกเพิ่มขึ้น และบันทึก transaction', async () => {
+      const db = JSON.parse(localStorage.getItem('los:db:v1') || '{}')
+      const initialGems = db.accounts['currency-a@b.co']?.player.currency.gem || 0
+
+      const result = await redeemCoupon(uidA, 'welcome2026')
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.player.currency.gem).toBe(initialGems + 50)
+      }
+
+      const txs = await getTransactions(uidA)
+      expect(txs[0].currency).toBe('gem')
+      expect(txs[0].source).toBe('coupon')
+      expect(txs[0].amount).toBe(50)
+      expect(txs[0].refId).toBe('WELCOME2026')
+    })
+
+    test('ปฏิเสธโค้ดคูปองที่ไม่มีอยู่จริง', async () => {
+      const result = await redeemCoupon(uidA, 'INVALIDCOUPON')
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error).toBe('โค้ดนี้ไม่ถูกต้องหรือหมดอายุแล้ว')
+      }
+    })
+
+    test('ปฏิเสธคูปองที่หมดอายุแล้ว', async () => {
+      COUPONS.TEST_EXPIRED = { gem: 10, expiresAt: '2020-01-01T00:00:00.000Z' }
+
+      const result = await redeemCoupon(uidA, 'TEST_EXPIRED')
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error).toBe('โค้ดนี้หมดอายุแล้ว')
+      }
+    })
+
+    test('ปฏิเสธการแลกซ้ำบนบัญชีเดียวกัน', async () => {
+      const first = await redeemCoupon(uidA, 'WELCOME2026')
+      expect(first.ok).toBe(true)
+
+      const second = await redeemCoupon(uidA, 'WELCOME2026')
+      expect(second.ok).toBe(false)
+      if (!second.ok) {
+        expect(second.error).toBe('ใช้โค้ดนี้ไปแล้ว')
+      }
+    })
+
+    test('ปฏิเสธการแลกหากโควตารวม (maxRedemptions) เต็มแล้ว (Cross-account validation)', async () => {
+      COUPONS.TEST_LIMIT = { gem: 10, maxRedemptions: 1 }
+
+      // บัญชีแรกแลกคูปองจำกัดโควตา -> สำเร็จ
+      const first = await redeemCoupon(uidA, 'TEST_LIMIT')
+      expect(first.ok).toBe(true)
+
+      // บัญชีที่สองพยายามแลกคูปองเดียวกัน -> ต้องถูกปฏิเสธเนื่องจากเต็มโควตาแล้ว
+      const second = await redeemCoupon(uidB, 'TEST_LIMIT')
+      expect(second.ok).toBe(false)
+      if (!second.ok) {
+        expect(second.error).toBe('โค้ดนี้ถูกใช้ครบจำนวนแล้ว')
+      }
+    })
+  })
+
+  describe('getTransactions ordering', () => {
+    test('ประวัติธุรกรรมเรียงจากเก่าไปใหม่', async () => {
+      await earnGold(uidA, 'quest', 100, 'first')
+      await earnGold(uidA, 'quest', 200, 'second')
+      await topUpGems(uidA, 'gem-small') // 60 gems
+
+      const txs = await getTransactions(uidA)
+      expect(txs.length).toBe(3)
+      expect(txs[0].refId).toBe('first')
+      expect(txs[1].refId).toBe('second')
+      expect(txs[2].refId).toBe('gem-small')
+    })
   })
 })

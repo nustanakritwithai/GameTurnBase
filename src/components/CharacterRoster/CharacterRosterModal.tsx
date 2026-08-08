@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useModalA11y } from '../../hooks/useModalA11y'
 import { ROSTER } from '../../game/characters'
 import { resolveHeroLevelStats } from '../../game/progression/heroStatsResolver'
+import { createDefaultSkillLevels } from '../../game/realtimeBattle/SkillProgressionSystem'
 import type { Player } from '../../types/player'
 import { CharacterCard } from './CharacterCard'
 import { CharacterPreview } from './CharacterPreview'
@@ -43,7 +44,7 @@ export function CharacterRosterModal({
             level: owned.level,
             exp: owned.exp,
             expToNext: owned.expToNext,
-            skillLevels: owned.skillLevels,
+            skillLevels: owned.skillLevels ?? createDefaultSkillLevels(),
             stats: levelStats ?? character.stats,
           },
         ]

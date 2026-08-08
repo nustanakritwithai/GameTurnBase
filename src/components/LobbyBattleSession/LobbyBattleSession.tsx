@@ -1,9 +1,14 @@
 import { Suspense, lazy, useCallback, useRef, useState } from 'react'
 import type { CurrencyResult, GoldSource, ItemResult } from '../../data/accountRepository.shared'
 import { ErrorBoundary, SceneCrashFallback } from '../ErrorBoundary/ErrorBoundary'
+import {
+  consumeStageEnergy,
+  normalizeEnergy,
+  tickEnergyRegen,
+} from '../../game/adventure/energySystem'
 import { appendBattleHistory } from '../../game/dialogue/actions'
 import { applyBattleExp } from '../../game/realtimeBattle/RewardSystem'
-import { isStageUnlocked } from '../../game/realtimeBattle/stageConfig'
+import { getRealtimeStage, isStageUnlocked } from '../../game/realtimeBattle/stageConfig'
 import { toLegacyBattleResult } from '../../game/realtimeBattle/BattleResultAdapter'
 import type { RealtimeBattleResult } from '../../game/realtimeBattle/types'
 import type { Player } from '../../types/player'
@@ -44,6 +49,24 @@ export function LobbyBattleSession({
   const savedRef = useRef(false)
   /** ยังไม่เลือกด่าน = null → แสดงหน้าเลือกด่านก่อน ยังไม่ mount BattleScene */
   const [stageId, setStageId] = useState<string | null>(null)
+
+  const handleSelectStage = useCallback(
+    (id: string) => {
+      const stage = getRealtimeStage(id)
+      if (!stage || !isStageUnlocked(id, player.progress.flags)) return
+
+      const energy = tickEnergyRegen(normalizeEnergy(player.progress.energy))
+      const nextEnergy = consumeStageEnergy(energy, stage)
+      void onPlayerChange({
+        ...player,
+        progress: { ...player.progress, energy: nextEnergy },
+      }).then((ok) => {
+        if (ok) setStageId(id)
+        return ok
+      })
+    },
+    [onPlayerChange, player],
+  )
 
   const handleComplete = useCallback(
     (result: RealtimeBattleResult) => {
@@ -99,7 +122,7 @@ export function LobbyBattleSession({
   // เช็คซ้ำก่อน mount เสมอ (ไม่ใช่แค่ตอนแสดงรายการ) — กันด่านล็อกหลุดเข้าห้องต่อสู้แม้ผ่าน
   // ทางที่ไม่ได้กดจากรายการนี้ตรง ๆ (เช่น state ค้างจาก re-render)
   if (!stageId || !isStageUnlocked(stageId, player.progress.flags)) {
-    return <StageSelect progress={player.progress} onSelect={setStageId} onClose={onExit} />
+    return <StageSelect progress={player.progress} onSelect={handleSelectStage} onClose={onExit} />
   }
 
   return (
