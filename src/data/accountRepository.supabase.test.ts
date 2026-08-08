@@ -40,6 +40,34 @@ describe('mapOwnedCharacterRow', () => {
     expect(owned.skillLevels).toEqual(stored)
   })
 
+  test('แถวที่มี talent_state / awakening_state — map ตรง shape OwnedCharacter', () => {
+    const owned = mapOwnedCharacterRow({
+      character_id: 'monkey-king',
+      level: 2,
+      exp: 10,
+      exp_to_next: 90,
+      obtained_at: '2026-01-01T00:00:00.000Z',
+      talent_state: { unlockedNodes: ['mk-talent-1'] },
+      awakening_state: { tier: 1, unlockedEffects: [] },
+    })
+
+    expect(owned.talentState).toEqual({ unlockedNodes: ['mk-talent-1'] })
+    expect(owned.awakeningState).toEqual({ tier: 1, unlockedEffects: [] })
+  })
+
+  test('แถวเก่าก่อน migration 0008 — default talent/awakening ว่าง', () => {
+    const owned = mapOwnedCharacterRow({
+      character_id: 'pig-warrior',
+      level: 3,
+      exp: 12,
+      exp_to_next: 90,
+      obtained_at: '2026-01-02T00:00:00.000Z',
+    })
+
+    expect(owned.talentState).toEqual({ unlockedNodes: [] })
+    expect(owned.awakeningState).toEqual({ tier: 0, unlockedEffects: [] })
+  })
+
   test('field mapping ตรงกับ shape ของ OwnedCharacter ฝั่ง localStorage (accountRepository.ts) เป๊ะ', () => {
     const owned = mapOwnedCharacterRow({
       character_id: 'pig-warrior',
@@ -56,6 +84,8 @@ describe('mapOwnedCharacterRow', () => {
       expToNext: 90,
       obtainedAt: '2026-01-02T00:00:00.000Z',
       skillLevels: createDefaultSkillLevels(),
+      talentState: { unlockedNodes: [] },
+      awakeningState: { tier: 0, unlockedEffects: [] },
     })
   })
 })

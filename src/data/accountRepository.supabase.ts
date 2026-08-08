@@ -57,6 +57,8 @@ interface OwnedCharacterRow {
   obtained_at: string
   /** แถวเก่าก่อน migration 0005 ยังไม่มีคอลัมน์นี้ — เติม default เหมือน normalizePlayer ฝั่ง localStorage */
   skill_levels?: OwnedCharacter['skillLevels'] | null
+  talent_state?: OwnedCharacter['talentState'] | null
+  awakening_state?: OwnedCharacter['awakeningState'] | null
 }
 
 /**
@@ -71,6 +73,8 @@ export function mapOwnedCharacterRow(row: OwnedCharacterRow): OwnedCharacter {
     expToNext: row.exp_to_next,
     obtainedAt: row.obtained_at,
     skillLevels: row.skill_levels ?? createDefaultSkillLevels(),
+    talentState: row.talent_state ?? { unlockedNodes: [] },
+    awakeningState: row.awakening_state ?? { tier: 0, unlockedEffects: [] },
   }
 }
 
@@ -373,6 +377,22 @@ export async function savePlayer(player: Player): Promise<boolean> {
     .eq('id', player.id)
 
   if (error) return false
+
+  const charRows = player.ownedCharacters.map((owned) => ({
+    profile_id: player.id,
+    character_id: owned.characterId,
+    level: owned.level,
+    exp: owned.exp,
+    exp_to_next: owned.expToNext,
+    obtained_at: owned.obtainedAt,
+    skill_levels: owned.skillLevels,
+    talent_state: owned.talentState ?? { unlockedNodes: [] },
+    awakening_state: owned.awakeningState ?? { tier: 0, unlockedEffects: [] },
+  }))
+  const { error: charError } = await supabase.from('owned_characters').upsert(charRows, {
+    onConflict: 'profile_id,character_id',
+  })
+  if (charError) return false
 
   // team_slots: upsert ทั้ง 4 ช่องทับของเดิม (ตาราง PK คือ profile_id+slot_index อยู่แล้ว)
   const slotRows = player.teamSlots.map((characterId, slot_index) => ({

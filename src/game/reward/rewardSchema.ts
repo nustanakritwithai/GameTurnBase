@@ -103,6 +103,8 @@ export interface RewardResolveContext {
   combatSummary?: CombatSummary
   isFirstClear: boolean
   failureRewardPolicy: FailureRewardPolicy
+  /** 0–1 dungeon progress for partial failure heroExp (computed upstream). */
+  dungeonProgressRatio?: number
   rng?: () => number
 }
 

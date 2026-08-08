@@ -51,6 +51,8 @@ export interface SurvivalParams {
   totalWaves?: number
   waveIntervalMs?: number
   timeLimitMs?: number
+  /** Multiplier on enemy maxHp for this stage only (1 = default). */
+  enemyHpScale?: number
   spawn?: SpawnConfig
 }
 

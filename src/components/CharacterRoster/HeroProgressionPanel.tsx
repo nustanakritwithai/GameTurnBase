@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Player } from '../../types/player'
 import type { SkillSlotId } from '../../game/progression/progressionSchema'
+import { progressionConfig } from '../../game/progression/progressionConfig'
 import { buildHeroProgressionViewModel } from '../../game/progression/progressionViewModel'
 import {
   advanceAwakening,
@@ -141,7 +142,7 @@ export function HeroProgressionPanel({
         </ul>
       </section>
 
-      {viewModel.talentNodes.length > 0 ? (
+      {progressionConfig.showTalentAwakeningUi && viewModel.talentNodes.length > 0 ? (
         <section className={styles.section}>
           <h4 className={styles.sectionTitle}>พรสวรรค์</h4>
           <ul className={styles.talentList}>
@@ -163,21 +164,23 @@ export function HeroProgressionPanel({
         </section>
       ) : null}
 
-      <section className={styles.section}>
-        <h4 className={styles.sectionTitle}>ปลุกพลัง</h4>
-        <p className={styles.awakeningSummary}>
-          {viewModel.awakening.summary}
-          {viewModel.awakening.tier >= viewModel.awakening.maxTier ? '' : ' (TBD content)'}
-        </p>
-        <button
-          type="button"
-          className={styles.upgradeBtn}
-          disabled={!viewModel.awakening.canAdvance}
-          onClick={handleAwakening}
-        >
-          {viewModel.awakening.tier >= viewModel.awakening.maxTier ? 'MAX' : 'ปลุกขั้นถัดไป'}
-        </button>
-      </section>
+      {progressionConfig.showTalentAwakeningUi ? (
+        <section className={styles.section}>
+          <h4 className={styles.sectionTitle}>ปลุกพลัง</h4>
+          <p className={styles.awakeningSummary}>
+            {viewModel.awakening.summary}
+            {viewModel.awakening.tier >= viewModel.awakening.maxTier ? '' : ' (TBD content)'}
+          </p>
+          <button
+            type="button"
+            className={styles.upgradeBtn}
+            disabled={!viewModel.awakening.canAdvance}
+            onClick={handleAwakening}
+          >
+            {viewModel.awakening.tier >= viewModel.awakening.maxTier ? 'MAX' : 'ปลุกขั้นถัดไป'}
+          </button>
+        </section>
+      ) : null}
     </div>
   )
 }

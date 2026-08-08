@@ -589,7 +589,7 @@ export class RealtimeBattleRuntime {
   spawnWaveAt(waveIndex: number): number {
     const state = this.state
     if (state.status !== 'running' && state.status !== 'intro') return 0
-    const spawned = createWaveEnemies(state.stage, waveIndex)
+    const spawned = createWaveEnemies(state.stage, waveIndex, state.enemyHpScale ?? 1)
     if (spawned.length === 0) return 0
     state.currentWaveIndex = waveIndex
     state.enemies = [...state.enemies, ...spawned]

@@ -11,6 +11,7 @@ import {
 import { resolveRewards } from './rewardResolver'
 import { buildResultViewModel } from './resultViewModel'
 import { isFirstClear } from './resultFinalizer'
+import { computeDungeonProgressRatio } from './rewardProgress'
 import type { ResolvedReward, ResultViewModel, RewardGrantResult } from './rewardSchema'
 
 export interface DungeonRewardPipelineInput {
@@ -42,6 +43,10 @@ export function resolveDungeonRewards(
     throw new Error(`No reward config for dungeon ${result.dungeonId}`)
   }
 
+  const progressRatio = result.success
+    ? 1
+    : computeDungeonProgressRatio(result.stageResults, dungeon.stages)
+
   const resolved = resolveRewards(definition, {
     dungeonId: result.dungeonId,
     runId: result.runId,
@@ -50,6 +55,7 @@ export function resolveDungeonRewards(
     combatSummary: result.combatSummary,
     isFirstClear: result.success && isFirstClear(progressFlags, result.dungeonId),
     failureRewardPolicy: getFailureRewardPolicy(result.dungeonId),
+    dungeonProgressRatio: progressRatio,
     rng,
   })
 

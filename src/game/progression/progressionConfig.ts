@@ -1,19 +1,23 @@
 /**
- * NON-PRODUCTION BALANCE — placeholder progression numerics until Ring 0 locks P8/P9.
+ * P8 BALANCE LOCK (Ring 0, 2026-08-08) — playtest baseline, NOT final live economy.
+ * nonProductionBalance stays true until a full playtest round completes.
  */
 
 import type { SkillSlotId, SkillLevelModifier } from './progressionSchema'
 
 export const PROGRESSION_SCHEMA_VERSION = 1
 
-/** Configurable cap — confirm with Ring 0 before treating 60 as production lock. */
+/** Ring 0 locked caps — framework limits for P8 playtest. */
 export const progressionConfig = {
   maxHeroLevel: 60,
+  /** Default max skill level (Ring 0: maxSkillLevel 5). Per-skill overrides allowed in fixtures. */
   defaultSkillMaxLevel: 5,
   maxAwakeningTier: 3,
   nonProductionBalance: true as const,
-  /** At max hero level: retain EXP at 0 (overflow ignored). Reversible gap if Ring 0 wants conversion. */
+  /** At max hero level: retain EXP at 0 (overflow ignored). */
   maxLevelExpBehavior: 'clamp_zero' as const,
+  /** Talent/awakening production content deferred — hide test-fixture UI, keep framework + tests. */
+  showTalentAwakeningUi: false,
 }
 
 export interface HeroExpTableEntry {
@@ -21,7 +25,7 @@ export interface HeroExpTableEntry {
   expToNext: number
 }
 
-/** Placeholder EXP table — levels 1–10 explicit, then formula fallback. */
+/** EXP table Lv1–10 — Ring 0 confirmed placeholder. Lv11+ uses formula below (tunable, not final lock). */
 export const PLACEHOLDER_HERO_EXP_TABLE: HeroExpTableEntry[] = [
   { level: 1, expToNext: 100 },
   { level: 2, expToNext: 150 },
@@ -38,10 +42,11 @@ export const PLACEHOLDER_HERO_EXP_TABLE: HeroExpTableEntry[] = [
 export function getExpToNextForLevel(level: number): number {
   const entry = PLACEHOLDER_HERO_EXP_TABLE.find((row) => row.level === level)
   if (entry) return entry.expToNext
+  // TUNABLE — not part of final balance lock (Ring 0: Lv11+ formula temporary).
   return Math.max(100, Math.round(100 + level * 80))
 }
 
-/** Placeholder per-level stat growth — NON-PRODUCTION. */
+/** Per-level stat growth — Ring 0 playtest baseline (HP +12, ATK +2, DEF +1.5, SPD +0.5). */
 export const PLACEHOLDER_LEVEL_STAT_GROWTH = {
   hp: 12,
   atk: 2,

@@ -55,7 +55,8 @@ export const REWARD_POOLS: Record<
 }
 
 export const FAILURE_REWARD_POLICIES: Record<string, FailureRewardPolicy> = {
-  'p5-test-dungeon': 'none',
+  /** Ring 0: partial — heroExp by stage/wave progress only; no first-clear or boss rewards. */
+  'p5-test-dungeon': 'partial',
 }
 
 export function getDungeonRewardDefinition(dungeonId: string): RewardDefinition | null {

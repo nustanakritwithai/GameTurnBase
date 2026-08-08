@@ -18,8 +18,10 @@ export const P5_TEST_DUNGEON: DungeonDefinition = {
       loseCondition: { kind: 'player_alive' },
       timer: { mode: 'countup' },
       params: {
-        totalWaves: 3,
-        waveIntervalMs: 1500,
+        totalWaves: 2,
+        waveIntervalMs: 2500,
+        /** Tutorial-easy: ~30% less enemy HP on stage 1 only (Ring 0). */
+        enemyHpScale: 0.7,
       },
       nextStageId: 'p5-stage-2-hazard',
     },

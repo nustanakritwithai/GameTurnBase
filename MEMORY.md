@@ -3,7 +3,7 @@
 > **Operator / Human User**: `HetCreep`
 > **Repository**: `KatomnoiStudio/LegendOfSoulTH`
 > **Default Branch**: `master`
-> **Last Updated**: 2026-08-08T by Claude (Sonnet 5) — PR #33 (P8 Character Progression) merged into `master`, reconciled against this session's guest/Turnstile work (item 119).
+> **Last Updated**: 2026-08-08T by `Cursor Agent` — PR #35 cleanup merged; PR #36 Ring 0 P8 balance lock (rebased on master).
 > **RULES_VERSION last synced: 24** (local `master`, this session) — bumped 17→18 (multi-dev task queue law) →19 (Agent Blueprint execution-order rule) →20 (Ring 0 traffic control law) →21 (claim protocol made Ring-0-locked) →22 (break-glass claim fallback for repo-admin devs) →23 (security doc sync law, from a `/gold-standard` AUDIT) →24 (tasks/memory parity law, HetCreep asked directly after catching TASKS.md drift twice) within this same session. **Unrelated note carried forward**: an earlier version of this line read "19" citing a pending fork PR #59 (Cursor Agent, cloud) that was never found merged to `origin/master` — this session passed through 19 independently via 17→18→19→20→21→22→23→24, not a confirmation of that PR landing. Still worth reconciling numbering with PR #59 if/when it lands.
 
 > **2026-08-06 overhaul**: this file had grown to 65+ interleaved, verbose items (two colliding numbering
@@ -27,13 +27,14 @@
 
 ## 🎯 Current Status
 
-- **Repo**: all 6 upstream PRs processed — #29/#28/#30/#31/#32 merged (items 109-113), **#33 merged** (item 119) — reconciled against this session's guest/Turnstile/isGuest work, no true design collision found (#33 adds a NEW per-hero level/EXP + talent/awakening layer on top of, not instead of, the already-shipped per-skill `SkillProgressionSystem` from #14).
+- **Repo**: upstream #29–#35 merged · **v0.12.0** on `master` · PR **#36** open (P8 balance lock).
 - **Version**: **0.12.0** (Google OAuth + guest accounts + Turnstile + P8 progression, items 115-119).
 - **Org/Live**: `KatomnoiStudio` — https://katomnoistudio.github.io/LegendOfSoulTH/
 - **Backend**: Supabase Auth+Postgres live, wired via `useAuth.ts` (item 41/87). `accountRepository.ts` (localStorage) stays as a dormant fallback seam only.
 - **Master Blueprint v3.0**: P0–P3 DONE · §3.6/§3.7 LOCKED · mobile combat UI done (§3.3) · P4 LANDED (item 109) · P5 dungeon slice + reward pipeline LANDED (items 111-112) · P8 per-hero progression LANDED (item 119, numerics still NON-PRODUCTION).
 - **Battle (current)**: realtime, 2.5D side-down, telegraph→hitstun→interrupt→knockdown/getUp lifecycle (P4), hard target-lock + soft-target assist, camera 30°+8-dir sprites +30% height fix (item 113), P5 dungeon run (`DungeonSession`, 4-stage vertical slice: survival→hazard→elite→boss) with its own reward pipeline (`src/game/reward/` — resolve→grant→save→result UI, independent of `StageVariationSystem.ts`) reachable via lobby "เริ่มการผจญภัย".
-- **Still open**: per-hero finisher numbers · fork gap issues [#34–#44](https://github.com/nustanakritwithai/GameTurnBase/issues/34) (not blocking) · P8 progression numerics still NON-PRODUCTION placeholders (EXP curve, stat growth, skill costs, awakening — item 119).
+- **P8 balance lock** (Ring 0, 2026-08-08): caps + playtest baseline in `progressionConfig.ts`/`rewardConfig.ts` · stage 1 tutorial-easy (2 waves, HP×0.7, 2500ms interval) · failure `partial` = heroExp by progress only · `nonProductionBalance` banner stays · talent/awakening UI hidden (`showTalentAwakeningUi: false`) · Supabase `0008_progression_state.sql` + `savePlayer` upserts owned_characters.
+- **Still open**: per-hero finisher numbers · fork gap issues [#34–#44](https://github.com/nustanakritwithai/GameTurnBase/issues/34) (not blocking) · Lv11+ EXP formula tunable · full playtest round before dropping NON-PRODUCTION banner.
 - **Gold-standard**: current figure is item 99's **77%** (12-dim AUDIT+FILL+ADOPT). An earlier ~84% figure merged in via PR #25 is SUPERSEDED — different scoring pass/day, don't average or reconcile.
 - **UI/UX gold-standard backlog**: `.agents/rules/gold-standard-baseline.md` — MUST-HAVEs closed, EXCELLENCE-tier gaps (3D char-select keyboard path, tab-strip `aria-controls`, `AuthModal` live-validation, breakpoint tokens, some reduced-motion) tracked there, not scaffolded.
 - **Security posture**: real Supabase/RLS/RPC trust boundary (`SECURITY.md` corrected item 99). CodeQL + Dependabot + Secret Scanning + Gitleaks + NPM Audit + branch protection + SHA-pinning all on; `secret_scanning_validity_checks` needs manual toggle (Settings → Code security).

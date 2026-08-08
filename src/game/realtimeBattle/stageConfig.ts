@@ -392,15 +392,8 @@ export const REALTIME_STAGES: Record<string, RealtimeBattleStage> = {
         id: 'w2',
         enemies: [
           { templateId: 'shadow-soldier', spawnIndex: 0 },
-          { templateId: 'spirit-guardian', spawnIndex: 2 },
-        ],
-      },
-      {
-        id: 'w3',
-        enemies: [
-          { templateId: 'shadow-soldier', spawnIndex: 0 },
           { templateId: 'shadow-soldier', spawnIndex: 1 },
-          { templateId: 'shadow-soldier', spawnIndex: 3 },
+          { templateId: 'spirit-guardian', spawnIndex: 2 },
         ],
       },
     ],

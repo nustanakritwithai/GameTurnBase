@@ -3,6 +3,25 @@ import type { RewardDefinition } from './rewardSchema'
 import { REWARD_POOLS } from './rewardConfig'
 import { validateRewardDefinition } from './rewardValidator'
 
+function getGuaranteedHeroExp(definition: RewardDefinition): number {
+  const entry = definition.guaranteed?.find((e) => e.type === 'heroExp')
+  return entry && 'amount' in entry ? entry.amount : 0
+}
+
+function resolvePartialFailureRewards(
+  definition: RewardDefinition,
+  context: RewardResolveContext,
+): RewardEntry[] {
+  const fullHeroExp = getGuaranteedHeroExp(definition)
+  if (fullHeroExp <= 0) return []
+
+  const ratio = context.dungeonProgressRatio ?? 0
+  if (ratio <= 0) return []
+
+  const amount = Math.max(1, Math.round(fullHeroExp * ratio))
+  return [{ type: 'heroExp', amount }]
+}
+
 function mergeEntries(entries: RewardEntry[]): RewardEntry[] {
   const map = new Map<string, RewardEntry>()
   for (const entry of entries) {
@@ -81,7 +100,7 @@ export function resolveRewards(
     }
     if (context.failureRewardPolicy === 'partial') {
       return {
-        entries: [{ type: 'currency', currencyId: 'gold', amount: 5 }],
+        entries: resolvePartialFailureRewards(definition, context),
         transactionId,
         trace,
       }

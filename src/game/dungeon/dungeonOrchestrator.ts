@@ -3,6 +3,7 @@ import type {
   DungeonResult,
   DungeonRunState,
   StageDefinition,
+  SurvivalParams,
 } from './dungeonSchema'
 import { advanceDungeonRun, createDungeonRun, getCurrentStage } from './dungeonRuntime'
 import { StageRuntime } from './stageRuntime'
@@ -58,7 +59,12 @@ export class DungeonOrchestrator {
 
   loadStage(stage: StageDefinition): boolean {
     const skipInitial = stage.stageType === 'survival'
-    const state = createRealtimeBattle(stage.arenaId, this.player, { skipInitialWave: skipInitial })
+    const enemyHpScale =
+      stage.stageType === 'survival' ? ((stage.params as SurvivalParams).enemyHpScale ?? 1) : 1
+    const state = createRealtimeBattle(stage.arenaId, this.player, {
+      skipInitialWave: skipInitial,
+      enemyHpScale,
+    })
     if (!state) return false
 
     this.runtime?.dispose()
