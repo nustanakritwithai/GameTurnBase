@@ -15,6 +15,7 @@ import {
   type Point,
 } from '../../game/adventure/movement'
 import { ROSTER, type Character } from '../../game/characters'
+import { deriveSpriteSize } from '../../game/realtimeBattle/entitySpritePresentation'
 import { SCENE_WIDTH, SCENE_HEIGHT } from '../../game/sceneDimensions'
 import { getWalkKit } from '../../game/walkKits'
 import { TEMPLE_LOBBY_BG } from '../../game/backgroundAssets'
@@ -44,6 +45,31 @@ const COMMIT_INTERVAL_MS = 1000 / TARGET_COMMIT_HZ
 
 const DEPTH_TOP = 530
 const DEPTH_BOTTOM = 790
+
+/*
+   เรขาคณิตของกล่อง .actor — ต้องตรงกับ WukongAdventure.module.css เป๊ะ ๆ
+
+   กล่องนี้ไม่ได้เป็นตัวกำหนด "ขนาด" ของตัวละครอีกแล้ว (เดิม object-fit: contain เป็นคนตัดสิน
+   ซึ่งแปลว่าชีตคนละขนาดได้ตัวคนละขนาดโดยไม่มีใครสั่ง — วัดจริงบนโปรดักชัน: ยืน 396x376
+   ใหญ่กว่าเดิน 640x512 อยู่ 81.5% ดู docs/SPRITE-CONFORMANCE.md ข้อ #100) ตอนนี้เหลือหน้าที่
+   สองอย่างคือเป็นกรอบวางตำแหน่ง และเป็นที่ยึดของเงา/ฝุ่น/ป้ายชื่อ
+*/
+const ACTOR_BOX_HEIGHT_PX = 420
+/** จุดที่ "พื้น" อยู่ในกล่อง — ค่าเดียวกับ transform-origin/translate ของ .actor */
+const ACTOR_FOOT_ANCHOR_PX = 356
+
+/**
+ * ความสูงของ "ตัวละครหนึ่งหน่วยมาตรฐาน" ในหน่วย px ของกล่อง .actor
+ *
+ * ค่าเดียวที่ฉากนี้กำหนดเอง — ขนาดจริงของทุกเฟรมมาจาก deriveSpriteSize() ตามข้อ E3 ของ
+ * docs/SPRITE-DESIGN-LOCK.md (ความสูงจากตารางเทียบพิกเซล, ความกว้างจากอัตราส่วนของชีตเอง,
+ * ตำแหน่งเท้าจาก bottomInsetPx) ไม่มีเลขขนาดพิมพ์มืออยู่ในไฟล์นี้อีก
+ *
+ * ที่มาของ 322.83: 340 x 376/396 คือความสูงที่ชีตอ้างอิง 396x376 เคยได้จาก object-fit:
+ * contain ในกล่องกว้าง 340 พอดี — ตั้งใจให้ "ท่ายืน" ซึ่งเป็นสิ่งแรกที่ผู้เล่นเห็นตอนเข้าฉาก
+ * มีขนาดเท่าเดิมเป๊ะ แล้วให้ท่าอื่นวิ่งมาหาขนาดนี้แทน (ท่าเดินเดิมเล็กเกินไป ไม่ใช่ท่ายืนใหญ่เกิน)
+ */
+const SPRITE_CANONICAL_HEIGHT_PX = 322.83
 
 const DIRECTIONS: Direction[] = [
   'down',
@@ -78,11 +104,73 @@ const DIRECTION_LABEL: Record<Direction, string> = {
   'down-left': 'เฉียงซ้ายล่าง',
 }
 
+/**
+ * เพดานจำนวนคำขอที่วิ่งพร้อมกันตอนโหลดเฟรมล่วงหน้า
+ *
+ * ของเดิมยิงทุก URL รวดเดียวใน tick เดียว วัดจริงบนโปรดักชัน 2026-08-11 (Resource Timing API)
+ * ได้ **96 คำขอภายในวินาทีเดียว เริ่มที่ 748ms หลังเปิดหน้า** — ตรงช่วงที่หน้ากำลังโหลด
+ * ทรัพยากรที่ผู้เล่นเห็นจริง ๆ อยู่พอดี เฟรมเดินที่จะได้ใช้อีกหลายวินาทีข้างหน้าจึงไปแย่งคิว
+ * กับของที่ต้องขึ้นจอเดี๋ยวนี้ (ดู docs/SPRITE-CONFORMANCE.md §Delivery)
+ *
+ * 4 คือค่าที่เลือกเอง ไม่ได้อ้างอิงมาตรฐานไหน — ตั้งใจให้ต่ำพอที่จะไม่กินคิวหน้าเว็บ
+ * แต่ยังโหลดครบ 80 เฟรมภายในไม่กี่ร้อยมิลลิวินาที (เฟรมละ ~26KB) ก่อนผู้เล่นจะเริ่มเดินจริง
+ */
+const PRELOAD_CONCURRENCY = 4
+
+/**
+ * URL ที่เคยสั่งโหลดไปแล้วในเซสชันนี้ — ระดับโมดูล ไม่ใช่ระดับ component โดยตั้งใจ
+ *
+ * วัดจริงบนโปรดักชันวันเดียวกัน: **144 คำขอ สำหรับ 97 URL = 1.48 เท่า** เพราะทุกครั้งที่
+ * effect ทำงานรอบใหม่ (สลับตัวละคร / mount ใหม่) จะสร้าง Image ชุดเดิมทั้งกองซ้ำ โดยไม่มีใคร
+ * ถือ Image เดิมไว้เลย (ทิ้งทันทีหลังตั้ง src) เหลือแต่ HTTP cache เป็นตัวกันเท่านั้น —
+ * ซึ่งเฟรมเหล่านี้เสิร์ฟมาด้วย max-age=600 และชื่อไฟล์ไม่มี content hash (ดูข้อ #108)
+ */
+const requestedFrames = new Set<string>()
+
+/**
+ * โหลดล่วงหน้าแบบเข้าคิว: ยิงพร้อมกันไม่เกิน PRELOAD_CONCURRENCY ตัว ตัวถัดไปเริ่มเมื่อ
+ * ตัวก่อนหน้าจบ (สำเร็จหรือ 404 ก็เดินหน้าต่อ ไม่งั้นคิวค้างทั้งกองเพราะไฟล์เดียวหาย)
+ * URL ที่เคยสั่งไปแล้วจะไม่ถูกสั่งซ้ำ
+ */
 function preload(urls: string[]) {
-  urls.forEach((url) => {
+  const queue: string[] = []
+  for (const url of urls) {
+    if (requestedFrames.has(url)) continue
+    requestedFrames.add(url)
+    queue.push(url)
+  }
+
+  let next = 0
+  const pump = () => {
+    if (next >= queue.length) return
     const image = new Image()
-    image.src = url
-  })
+    /*
+      บอกเบราว์เซอร์ตรง ๆ ว่าของพวกนี้รอได้ ให้ของที่ผู้เล่นเห็นตอนนี้ไปก่อน
+      เป็น hint เฉย ๆ และเพิ่งเป็น Baseline ปี 2024 — เบราว์เซอร์ที่ต่ำกว่า floor ของ
+      build target (ดู vite.config.ts) จะไม่รู้จักแล้วข้ามไปเงียบ ๆ ไม่พัง
+      ตัวที่กันการยิงรัวจริง ๆ ในทุกเบราว์เซอร์คือคิวด้านบน ไม่ใช่บรรทัดนี้
+    */
+    image.fetchPriority = 'low'
+    image.addEventListener('load', pump)
+    image.addEventListener('error', pump)
+    image.src = queue[next]
+    next += 1
+  }
+  for (let slot = 0; slot < PRELOAD_CONCURRENCY; slot += 1) pump()
+}
+
+/**
+ * เฟรม idle ที่ฉากนี้เลือกมาวาดจากเลขเฟรมปัจจุบัน — **ที่เดียวในไฟล์**
+ *
+ * ใช้ทั้งตอนเรนเดอร์และตอนสร้างรายการโหลดล่วงหน้า ห้ามคำนวณซ้ำที่อื่น ไม่งั้นรายการที่โหลด
+ * กับสิ่งที่วาดจริงจะเพี้ยนออกจากกันเงียบ ๆ (ที่มาของข้อ #107: view.frame วิ่งแค่ 0-7 ฉากนี้
+ * จึงวาด idle ได้แค่ 8 เฟรมจาก 24 แต่เดิมพรีโหลดไปทั้ง 24 — อีก 16 เฟรมโหลดมาไม่ได้ใช้เลย
+ * เฟรมทั้ง 24 ไม่ได้ตายนะ CharacterPreview ใช้ครบทุกเฟรม แค่ฉากนี้ไม่ต้องโหลดมันมา)
+ *
+ * ค่าคงที่ 3 เป็นของเดิม ไม่ใช่ขอบเขตของข้อนี้ — ดู docs/SPRITE-CONFORMANCE.md §B3
+ */
+function idleFrameIndex(frame: number, idleCount: number) {
+  return (frame * 3) % idleCount
 }
 
 /**
@@ -213,8 +301,25 @@ export function WukongAdventure({
     // ต้อง re-run effect นี้เพื่อ attach ref เข้ากับ <section> จริงที่เพิ่งขึ้น
   }, [active?.id])
 
-  // โหลดเฟรมของตัวที่กำลังใช้ล่วงหน้า เพื่อไม่ให้ภาพกระพริบตอนเริ่มเดิน
-  const allFrames = useMemo(() => {
+  /*
+     เฟรมที่ฉากนี้วาดได้จริง — โหลดล่วงหน้าไว้ไม่ให้ภาพกระพริบตอนเริ่มเดิน
+
+     เรียงตามลำดับที่ได้ใช้จริง เพราะคิวโหลดยิงทีละไม่กี่ตัว (ดู preload ด้านบนไฟล์)
+     ตัวที่อยู่ต้นรายการจึงมาถึงก่อน: ยืนหันหน้า (เห็นทันทีที่เข้าฉาก) → หันทิศ (เห็นเมื่อ
+     หันไปทางอื่น) → เดิน (ได้ใช้เมื่อผู้เล่นเริ่มขยับ ซึ่งช้ากว่าเสมอ)
+
+     ชื่อเดิมคือ allFrames แต่ตอนนี้ไม่ใช่ "ทั้งหมด" อีกแล้ว — เฟรม idle ที่ฉากนี้วาดไม่ถึง
+     ไม่อยู่ในรายการนี้ (ดู idleFrameIndex)
+  */
+  const drawableFrames = useMemo(() => {
+    const idleIndexes = new Set(
+      Array.from({ length: FRAME_COUNT }, (_, frame) => idleFrameIndex(frame, kit.idleCount)),
+    )
+    const idle = [...idleIndexes].map((index) => `${kit.idlePrefix}-${index}.webp`)
+    const turn = Array.from(
+      { length: FRAME_COUNT },
+      (_, frame) => `${kit.turnPrefix}-${frame}.webp`,
+    )
     const walk = kit.walkPrefix
       ? DIRECTIONS.flatMap((direction) =>
           Array.from(
@@ -223,18 +328,10 @@ export function WukongAdventure({
           ),
         )
       : []
-    const turn = Array.from(
-      { length: FRAME_COUNT },
-      (_, frame) => `${kit.turnPrefix}-${frame}.webp`,
-    )
-    const idle = Array.from(
-      { length: kit.idleCount },
-      (_, frame) => `${kit.idlePrefix}-${frame}.webp`,
-    )
-    return [...walk, ...turn, ...idle]
+    return [...idle, ...turn, ...walk]
   }, [kit])
 
-  useEffect(() => preload(allFrames), [allFrames])
+  useEffect(() => preload(drawableFrames), [drawableFrames])
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -452,7 +549,7 @@ export function WukongAdventure({
   const depthProgress = Math.min(1, Math.max(0, (view.y - DEPTH_TOP) / (DEPTH_BOTTOM - DEPTH_TOP)))
   const perspectiveScale = 0.8 + depthProgress * 0.24
   const turnUrl = `${kit.turnPrefix}-${TURN_INDEX[view.direction]}.webp`
-  const idleFrame = view.direction === 'down' ? (view.frame * 3) % kit.idleCount : null
+  const idleFrame = view.direction === 'down' ? idleFrameIndex(view.frame, kit.idleCount) : null
 
   // เดิน = เฟรมเดินตามทิศ, ยืนหันหน้า = เฟรม idle, ยืนหันทิศอื่น = เฟรมหันทิศ
   const spriteUrl = view.moving
@@ -460,6 +557,19 @@ export function WukongAdventure({
     : idleFrame !== null
       ? `${kit.idlePrefix}-${idleFrame}.webp`
       : turnUrl
+
+  /*
+     ขนาดและตำแหน่งของภาพเฟรมนี้ — คำนวณจากพิกเซลจริงของชีต (E3) ไม่ใช่ให้กล่องเป็นคนตัดสิน
+     `bottom` วางให้ "เส้นเท้า" ของชีต (bottomInsetPx) ตกลงที่ ACTOR_FOOT_ANCHOR_PX พอดี
+     ทุกชีต — ซึ่งเป็นจุดเดียวกับที่เงาวงรีอยู่ (ข้อ #106: เดิมเท้าต่ำกว่าเงา 30-53px
+     เงาจึงไปอยู่ระดับหัวเข่า)
+  */
+  const spriteSize = deriveSpriteSize(spriteUrl, SPRITE_CANONICAL_HEIGHT_PX)
+  const spriteStyle: CSSProperties = {
+    width: `${spriteSize.width}px`,
+    height: `${spriteSize.height}px`,
+    bottom: `${ACTOR_BOX_HEIGHT_PX - ACTOR_FOOT_ANCHOR_PX - spriteSize.footInset}px`,
+  }
 
   const actorScreenPos = worldToScreen(view)
   const actorStyle = {
@@ -555,7 +665,13 @@ export function WukongAdventure({
             <i />
           </div>
         ) : null}
-        <img className={styles.sprite} src={spriteUrl} alt={active.name} draggable={false} />
+        <img
+          className={styles.sprite}
+          style={spriteStyle}
+          src={spriteUrl}
+          alt={active.name}
+          draggable={false}
+        />
         {mode === 'moonlight' ? null : (
           <div className={styles.nameplate}>
             <span>{active.epithet}</span>

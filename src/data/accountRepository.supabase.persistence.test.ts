@@ -229,25 +229,57 @@ describe('F1: savePlayer writes the friends list', () => {
   })
 })
 
-describe('F3: loadPlayer checks every one of its 8 queries', () => {
-  test.each(['owned_characters', 'team_slots', 'inventory_items', 'friends', 'battle_history'])(
-    'a failed %s query fails the load loudly instead of degrading to empty',
-    async (table) => {
-      mockTables({ [table]: { message: 'network error' } })
+describe('F3: loadPlayer checks every one of its queries', () => {
+  /*
+    The table list is DISCOVERED from a real healthy load, never typed out beside loadPlayer.
+
+    The first version of this test hand-listed five tables while loadPlayer issues eight, so
+    `profiles`, `admin_accounts` and `gacha_pity` went unexercised, and a ninth query added later
+    would have been born untested. That is the same failure F2 below was built to stop, one lane
+    over: a list maintained by hand next to the thing it describes drifts from it silently.
+  */
+  async function tablesLoadPlayerReads(): Promise<string[]> {
+    const { getSessionPlayer } = await import('./accountRepository.supabase')
+    await getSessionPlayer()
+    return [...new Set(fromMock.mock.calls.map(([table]) => table as string))]
+  }
+
+  test('every table loadPlayer reads fails the load loudly instead of degrading to empty', async () => {
+    const tables = await tablesLoadPlayerReads()
+    /*
+      A tripwire, not a hand-list. It does two jobs: a changed query count says "confirm the new
+      slice is covered", and it stops a discovery bug from passing this test on an empty loop —
+      the standing hazard of deriving a list instead of writing one.
+    */
+    expect(tables).toHaveLength(8)
+
+    const outcomes: Array<{ table: string; loaded: boolean; reported: number }> = []
+    for (const table of tables) {
+      reportErrorMock.mockClear()
+      mockTables({ [table]: { message: `read failed: ${table}` } })
       const { getSessionPlayer } = await import('./accountRepository.supabase')
+      outcomes.push({
+        table,
+        // A boolean on purpose: a whole Player per row buries which slice broke under 500 lines.
+        loaded: (await getSessionPlayer()) !== null,
+        reported: reportErrorMock.mock.calls.filter(
+          ([code, tier, cause]) =>
+            code === 'PLAYER_LOAD_FAIL' &&
+            tier === 'visible' &&
+            (cause as { message?: string } | null)?.message === `read failed: ${table}`,
+        ).length,
+      })
+    }
 
-      const player = await getSessionPlayer()
-
-      // Old code inspected profileRes only: it returned a fully-formed Player with this table's
-      // data silently blank, and the next savePlayer wrote that blankness back over the real rows.
-      expect(player).toBeNull()
-      expect(reportErrorMock).toHaveBeenCalledWith(
-        'PLAYER_LOAD_FAIL',
-        'visible',
-        expect.objectContaining({ message: 'network error' }),
-      )
-    },
-  )
+    /*
+      `loaded: false` IS the "cannot reach a write" assertion. Every caller of loadPlayer
+      (login/register/guest/session restore/each RPC's follow-up read) is typed `Player | null`
+      and bails on null, so a degraded read leaves no object for savePlayer to write back.
+      Old code inspected profileRes only: the other seven returned a fully-formed Player with
+      that slice silently blank, and the next savePlayer wrote the blankness over the real rows.
+    */
+    expect(outcomes).toEqual(tables.map((table) => ({ table, loaded: false, reported: 1 })))
+  })
 
   test('a healthy load still returns the full player — the check is not a blanket refusal', async () => {
     const { getSessionPlayer } = await import('./accountRepository.supabase')

@@ -8,7 +8,12 @@
   touch-action: none;
   cursor: crosshair;
   background:
-    linear-gradient(180deg, rgba(3, 9, 24, 0.08) 28%, rgba(5, 10, 20, 0.24) 58%, rgba(3, 6, 14, 0.54) 100%),
+    linear-gradient(
+      180deg,
+      rgba(3, 9, 24, 0.08) 28%,
+      rgba(5, 10, 20, 0.24) 58%,
+      rgba(3, 6, 14, 0.54) 100%
+    ),
     var(--bg-temple) center / cover no-repeat;
 }
 
@@ -25,7 +30,16 @@
   width: min(90%, 26rem);
   padding: 28px 26px;
   border: 1px solid rgb(226 183 88 / 46%);
-  clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px);
+  clip-path: polygon(
+    18px 0,
+    calc(100% - 18px) 0,
+    100% 18px,
+    100% calc(100% - 18px),
+    calc(100% - 18px) 100%,
+    18px 100%,
+    0 calc(100% - 18px),
+    0 18px
+  );
   background: linear-gradient(165deg, rgb(12 28 44 / 96%), rgb(5 12 24 / 97%));
   text-align: center;
   box-shadow: 0 20px 52px rgb(0 0 0 / 68%);
@@ -47,7 +61,14 @@
 .emptyCast button {
   padding: 9px 22px;
   border: 1px solid rgb(226 183 88 / 55%);
-  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+  clip-path: polygon(
+    10px 0,
+    calc(100% - 10px) 0,
+    100% 50%,
+    calc(100% - 10px) 100%,
+    10px 100%,
+    0 50%
+  );
   background: linear-gradient(180deg, rgb(240 200 90 / 22%), rgb(140 96 30 / 16%));
   color: #f2d98e;
   font-family: var(--font-display);
@@ -64,13 +85,20 @@
   z-index: 3;
   cursor: default;
   background:
-    linear-gradient(180deg, rgba(6, 14, 38, 0.34) 20%, rgba(4, 10, 26, 0.5) 60%, rgba(2, 5, 14, 0.72) 100%),
+    linear-gradient(
+      180deg,
+      rgba(6, 14, 38, 0.34) 20%,
+      rgba(4, 10, 26, 0.5) 60%,
+      rgba(2, 5, 14, 0.72) 100%
+    ),
     var(--bg-temple) center / cover no-repeat;
 }
 
 /* มือถือ: MainNavigation กินมุมล่างซ้ายอยู่ ดันปุ่มควบคุมทิศทางขึ้นให้พ้น */
 @media (pointer: coarse), (max-width: 820px) {
-  .moonlight .mobilePad { bottom: 96px; }
+  .moonlight .mobilePad {
+    bottom: 96px;
+  }
 }
 
 /* ลำแสงจันทร์ทอดลงกลางลาน */
@@ -101,7 +129,12 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 49%, transparent 0 30%, rgba(1, 5, 14, 0.25) 78%, rgba(0, 2, 8, 0.72) 100%),
+    radial-gradient(
+      circle at 50% 49%,
+      transparent 0 30%,
+      rgba(1, 5, 14, 0.25) 78%,
+      rgba(0, 2, 8, 0.72) 100%
+    ),
     linear-gradient(90deg, rgba(0, 6, 16, 0.38), transparent 14% 86%, rgba(0, 6, 16, 0.38));
   box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.68);
 }
@@ -115,8 +148,12 @@
   height: 44%;
   pointer-events: none;
   opacity: 0.22;
-  background:
-    repeating-radial-gradient(ellipse at 50% 100%, transparent 0 78px, rgba(111, 222, 211, 0.34) 80px 82px, transparent 85px 134px);
+  background: repeating-radial-gradient(
+    ellipse at 50% 100%,
+    transparent 0 78px,
+    rgba(111, 222, 211, 0.34) 80px 82px,
+    transparent 85px 134px
+  );
   mask-image: linear-gradient(transparent, #000 32%);
 }
 
@@ -126,7 +163,14 @@
   pointer-events: none;
   background:
     radial-gradient(circle at 50% 45%, rgba(94, 231, 219, 0.09), transparent 27%),
-    linear-gradient(115deg, transparent 0 35%, rgba(255, 217, 106, 0.035) 37% 38%, transparent 40% 61%, rgba(255, 217, 106, 0.03) 63% 64%, transparent 66%);
+    linear-gradient(
+      115deg,
+      transparent 0 35%,
+      rgba(255, 217, 106, 0.035) 37% 38%,
+      transparent 40% 61%,
+      rgba(255, 217, 106, 0.03) 63% 64%,
+      transparent 66%
+    );
   animation: breatheLight 8s ease-in-out infinite alternate;
 }
 
@@ -150,7 +194,8 @@
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  padding: clamp(8px, 2.5vw, 13px) clamp(14px, 4vw, 28px) clamp(8px, 2.5vw, 13px) clamp(16px, 4.5vw, 31px);
+  padding: clamp(8px, 2.5vw, 13px) clamp(14px, 4vw, 28px) clamp(8px, 2.5vw, 13px)
+    clamp(16px, 4.5vw, 31px);
   display: grid;
   gap: 1px;
   background:
@@ -212,7 +257,9 @@
   background: linear-gradient(180deg, rgba(15, 42, 53, 0.92), rgba(7, 23, 34, 0.96));
   border: 1px solid rgba(213, 173, 80, 0.58);
   border-radius: 5px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35), inset 0 0 16px rgba(68, 186, 177, 0.08);
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.35),
+    inset 0 0 16px rgba(68, 186, 177, 0.08);
 }
 
 .status div {
@@ -267,8 +314,12 @@
   background: linear-gradient(180deg, #234b56, #0c2936 56%, #081d2b);
   border: 1px solid #aa8132;
   border-radius: 4px;
-  box-shadow: inset 0 0 0 2px rgba(240, 198, 91, 0.08), 0 8px 20px rgba(0, 0, 0, 0.38);
-  transition: transform 160ms ease, filter 160ms ease;
+  box-shadow:
+    inset 0 0 0 2px rgba(240, 198, 91, 0.08),
+    0 8px 20px rgba(0, 0, 0, 0.38);
+  transition:
+    transform 160ms ease,
+    filter 160ms ease;
 }
 
 .exitButton span {
@@ -303,7 +354,8 @@
   width: 122px;
   height: 13px;
   margin-bottom: 5px;
-  background: linear-gradient(90deg, transparent, #e2b94f 32% 68%, transparent) center / 100% 1px no-repeat;
+  background: linear-gradient(90deg, transparent, #e2b94f 32% 68%, transparent) center / 100% 1px
+    no-repeat;
 }
 
 .locationTitle span::after {
@@ -334,19 +386,25 @@
   width: 340px;
   height: 420px;
   pointer-events: none;
-  transform: translate(calc(var(--actor-x) - 170px), calc(var(--actor-y) - 356px)) scale(var(--actor-scale));
+  transform: translate(calc(var(--actor-x) - 170px), calc(var(--actor-y) - 356px))
+    scale(var(--actor-scale));
   transform-origin: 50% 356px;
   will-change: transform;
 }
 
+/*
+   ขนาด (width/height) และระยะจากพื้นกล่อง (bottom) มาจาก inline style ของ WukongAdventure.tsx
+   คำนวณจากพิกเซลจริงของชีตแต่ละชุด ตามข้อ E3 ของ docs/SPRITE-DESIGN-LOCK.md
+
+   เดิมเป็น inset:0 + width/height:100% + object-fit:contain — กล่องเป็นคนตัดสินขนาด ผลคือ
+   ชีต 396x376 กับ 640x512 ได้ตัวละครคนละขนาด ต่างกันถึง 81.5% และเท้าตกคนละที่ (ข้อ #100/#106)
+   ที่นี่จึงเหลือแค่จัดกึ่งกลางแนวนอนกับเงา ไม่ยุ่งกับขนาดอีก
+*/
 .sprite {
   position: absolute;
-  inset: 0;
   z-index: 3;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: 50% 100%;
+  left: 50%;
+  transform: translateX(-50%);
   filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.48)) drop-shadow(0 0 7px rgba(229, 146, 45, 0.08));
 }
 
@@ -358,7 +416,12 @@
   width: 145px;
   height: 36px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.2) 58%, transparent 74%);
+  background: radial-gradient(
+    ellipse,
+    rgba(0, 0, 0, 0.68),
+    rgba(0, 0, 0, 0.2) 58%,
+    transparent 74%
+  );
   transform: translateX(-50%);
   filter: blur(2px);
 }
@@ -407,7 +470,9 @@
   border: 2px solid rgba(102, 235, 214, 0.62);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 12px rgba(82, 220, 208, 0.58), inset 0 0 9px rgba(82, 220, 208, 0.3);
+  box-shadow:
+    0 0 12px rgba(82, 220, 208, 0.58),
+    inset 0 0 9px rgba(82, 220, 208, 0.3);
   pointer-events: none;
   animation: destinationPulse 0.8s ease-in-out infinite alternate;
 }
@@ -454,10 +519,22 @@
   animation: dustRise 0.65s ease-out both;
 }
 
-.dust i:nth-child(1) { --dust-x: -39px; animation-delay: 0ms; }
-.dust i:nth-child(2) { --dust-x: -18px; animation-delay: 45ms; }
-.dust i:nth-child(3) { --dust-x: 22px; animation-delay: 20ms; }
-.dust i:nth-child(4) { --dust-x: 42px; animation-delay: 65ms; }
+.dust i:nth-child(1) {
+  --dust-x: -39px;
+  animation-delay: 0ms;
+}
+.dust i:nth-child(2) {
+  --dust-x: -18px;
+  animation-delay: 45ms;
+}
+.dust i:nth-child(3) {
+  --dust-x: 22px;
+  animation-delay: 20ms;
+}
+.dust i:nth-child(4) {
+  --dust-x: 42px;
+  animation-delay: 65ms;
+}
 
 .helpBar {
   position: absolute;
@@ -474,7 +551,9 @@
   background: linear-gradient(180deg, rgba(11, 31, 40, 0.9), rgba(5, 18, 27, 0.96));
   border: 1px solid rgba(194, 154, 66, 0.58);
   border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42), inset 0 0 14px rgba(75, 214, 196, 0.05);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.42),
+    inset 0 0 14px rgba(75, 214, 196, 0.05);
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -509,7 +588,9 @@
   box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25);
 }
 
-.mouse { border-radius: 11px !important; }
+.mouse {
+  border-radius: 11px !important;
+}
 
 .mobilePad {
   /* ปุ่มย่อ 38-50px ตามความกว้างจอ — จอสัมผัสมีขนาดหลากหลายมาก ไม่ใช่แค่มือถือเล็ก */
@@ -536,40 +617,94 @@
   background: rgba(8, 31, 41, 0.88);
   border: 1px solid rgba(198, 160, 74, 0.7);
   border-radius: 6px;
-  box-shadow: inset 0 0 10px rgba(73, 207, 190, 0.08), 0 5px 12px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 0 10px rgba(73, 207, 190, 0.08),
+    0 5px 12px rgba(0, 0, 0, 0.3);
 }
 
-.mobilePad button { font-family: inherit; touch-action: none; }
-.mobilePad button:active { background: rgba(31, 90, 91, 0.94); transform: scale(0.94); }
-.up { left: calc(var(--pad-cell) + var(--pad-gap)); top: 0; }
-.left { left: 0; top: calc(var(--pad-cell) + var(--pad-gap)); }
-.padCenter { left: calc(var(--pad-cell) + var(--pad-gap)); top: calc(var(--pad-cell) + var(--pad-gap)); color: rgba(224, 190, 98, 0.42); }
-.right { right: 0; top: calc(var(--pad-cell) + var(--pad-gap)); }
-.down { left: calc(var(--pad-cell) + var(--pad-gap)); bottom: 0; }
+.mobilePad button {
+  font-family: inherit;
+  touch-action: none;
+}
+.mobilePad button:active {
+  background: rgba(31, 90, 91, 0.94);
+  transform: scale(0.94);
+}
+.up {
+  left: calc(var(--pad-cell) + var(--pad-gap));
+  top: 0;
+}
+.left {
+  left: 0;
+  top: calc(var(--pad-cell) + var(--pad-gap));
+}
+.padCenter {
+  left: calc(var(--pad-cell) + var(--pad-gap));
+  top: calc(var(--pad-cell) + var(--pad-gap));
+  color: rgba(224, 190, 98, 0.42);
+}
+.right {
+  right: 0;
+  top: calc(var(--pad-cell) + var(--pad-gap));
+}
+.down {
+  left: calc(var(--pad-cell) + var(--pad-gap));
+  bottom: 0;
+}
 
 @keyframes breatheLight {
-  from { opacity: 0.62; }
-  to { opacity: 1; }
+  from {
+    opacity: 0.62;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes statusPulse {
-  from { opacity: 0.55; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1.1); }
+  from {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 
 @keyframes destinationPulse {
-  from { opacity: 0.55; transform: translate(-50%, -50%) scale(0.9); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1.07); }
+  from {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.07);
+  }
 }
 
 @keyframes dustRise {
-  from { opacity: 0.68; transform: translate(0, 0) scale(0.65); }
-  to { opacity: 0; transform: translate(var(--dust-x), -19px) scale(1.8); }
+  from {
+    opacity: 0.68;
+    transform: translate(0, 0) scale(0.65);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--dust-x), -19px) scale(1.8);
+  }
 }
 
 @media (pointer: coarse), (max-width: 820px) {
-  .mobilePad { display: block; }
-  .helpBar { left: auto; right: 25px; transform: none; }
+  .mobilePad {
+    display: block;
+  }
+  .helpBar {
+    left: auto;
+    right: 25px;
+    transform: none;
+  }
   .helpBar span:first-child,
-  .helpBar i:first-of-type { display: none; }
+  .helpBar i:first-of-type {
+    display: none;
+  }
 }

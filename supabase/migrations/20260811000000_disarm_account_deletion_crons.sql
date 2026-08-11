@@ -1,0 +1,81 @@
+-- Disarm both account-deletion cron jobs IN A FILE — make "unscheduled" a property of this
+-- REPOSITORY instead of a property of one production instance's `cron.job` table.
+--
+-- ── HOW THIS IS DEPLOYED ────────────────────────────────────────────────────────────────────
+-- Applied by the OWNER via the Supabase SQL Editor (migration relay), NEVER `supabase db push`,
+-- and never by an agent. This file is the durable record of what was pasted.
+-- Every statement is RE-RUNNABLE; a double-paste of the whole file is safe.
+--
+-- ── THE DEFECT, AND HOW IT WAS FOUND ────────────────────────────────────────────────────────
+-- Both jobs were unscheduled on production by hand on 2026-08-10 (MEMORY item 190 Part B), and
+-- two migrations since then say so in their headers — 20260810160000 lines 22-28 and
+-- 20260810170000 lines 10-14. Every one of those statements is TRUE, and every one of them is
+-- a COMMENT. Grepping the whole repository for the two verbs is the entire finding:
+--
+--     cron.schedule      -> EXECUTABLE, at 0006_guest_cleanup.sql:38 and
+--                           0014_dead_account_cleanup.sql:80
+--     cron.unschedule    -> a `--` comment. Every single occurrence, without exception.
+--
+-- So the disarm existed only as a row that is no longer in one production table. Replay this
+-- migration chain anywhere that table does not already carry the deletion — a restore into a
+-- fresh project, a `db reset`, a new contributor's local Supabase, a CI harness — and 0006 and
+-- 0014 re-ARM both jobs with nobody having decided anything. Not a theory: a CoalBoard seat
+-- replayed the chain in PGlite against a schedule-capturing stub and watched both jobnames come
+-- back. `src/data/progressionCostAuthority.integration.test.ts` now runs that same replay on
+-- every `npm test`, and asserts the end state instead of trusting a header comment.
+--
+-- ── WHAT IS AT STAKE IF THEY COME BACK ──────────────────────────────────────────────────────
+-- Measured for task #91 against the population as it stands, each job's own predicate projected
+-- forward to its own thresholds (figures carried here so the next reader does not have to
+-- rediscover them; the author of this file has no production access and did not re-derive them):
+--   * guest job — deletes 21 of 24 guest accounts on 2026-09-08, and all 24 by 09-09.
+--     Exactly 1 of those 24 has ever recorded a battle.
+--   * registered job — reaches 12 accounts by 2026-09-08. Its first victim is the studio's own
+--     address.
+-- One deletion cascades through 11 tables (~430 rows for a modestly-populated account). This
+-- project runs with `pitr_enabled: false` and an empty backup list. There is no undo. That
+-- combination is why the interim posture is "off", and why "off" now has to survive a replay.
+--
+-- ── WHAT THIS FILE DELIBERATELY DOES NOT DO ─────────────────────────────────────────────────
+-- It does NOT drop `public.cleanup_stale_guest_accounts()` or
+-- `public.cleanup_dead_unplayed_accounts()`, and it does not touch their bodies or their EXECUTE
+-- revokes (20260810160000 F1/F2, 20260810170000 sections 2 and 3). We are removing the trigger,
+-- not the gun. Those hardened predicates are the good and expensive work of two prior
+-- migrations; they stay exactly as they are, so that arming either job is one deliberate
+-- `cron.schedule(...)` on the day the owner decides to.
+--
+-- And that day has not come, because the POLICY IS NOT SETTLED — task #95, and it is the
+-- owner's call, not an agent's. Is "never played a match" even the right criterion? Is 30 days
+-- defensible when Kakao uses 3 years and Google uses 2? Nothing in this file answers either
+-- question, and nothing in this file should be read as an answer. It guarantees only that the
+-- answer gets DECIDED rather than defaulted to "delete" by a chain replay nobody was watching.
+--
+-- ── TO WHOEVER COMES NEXT ───────────────────────────────────────────────────────────────────
+-- Do not "helpfully" undo this. Specifically: do not delete this file as redundant because
+-- production is already disarmed (production is not the only environment, and that is the whole
+-- defect); do not re-add a `cron.schedule` for either jobname here or in any later migration;
+-- and do not convert the statement below into a comment the way every prior unschedule was.
+-- Two tests fail if you do — `src/data/supabaseMigrations.contract.test.ts` on the source text
+-- of every migration file, and the PGlite chain replay named above on the resulting state.
+-- Re-arming is a deliberate act the owner runs once against production, after the PRE-ARM CHECK
+-- at the bottom of 20260810170000. It is not a line in a migration file.
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════
+-- THE DISARM
+-- ════════════════════════════════════════════════════════════════════════════════════════════
+-- Set-based on purpose. `cron.unschedule('some-name')` RAISES when the job is absent, which
+-- would abort the paste in exactly the environment this file exists for — a fresh one, where
+-- neither job was ever scheduled — and would abort the second paste of a retried relay. Reading
+-- the jobids out of `cron.job` first makes "already gone" mean zero rows, and therefore zero
+-- calls: idempotent by construction, with no exception handler swallowing anything real.
+--
+-- The list is literal and exhaustive by name. This project runs four other cron jobs, and none
+-- of them deletes an account: cleanup-old-audit-log-entries (0007) prunes auth.audit_log_entries
+-- past 90 days, cleanup-stale-rpc-rate-limit-rows (0011) prunes a rate-limit table daily,
+-- archive-currency-transactions (20260809090000) moves ledger rows into an archive table
+-- monthly, and reap-expired-private-pvp-rooms (20260809064000) expires abandoned PvP rooms every
+-- minute. A pattern match — `jobname like 'cleanup-%'` — would have taken the first two of those
+-- with it and silently stopped both a retention job and an anti-farming bound. Name the two.
+select cron.unschedule(j.jobid)
+from cron.job j
+where j.jobname in ('cleanup-stale-guest-accounts', 'cleanup-dead-unplayed-accounts');

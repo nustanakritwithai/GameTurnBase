@@ -142,9 +142,7 @@ export function DungeonSession({
         onMove={setJoystick}
         onAttack={pressAttack}
         onSkill={pressSkill}
-        objectiveOverlay={
-          stageSnapshot ? <StageObjectiveHud snapshot={stageSnapshot} /> : undefined
-        }
+        objectiveOverlay={<StageObjectiveHud snapshot={stageSnapshot} />}
       />
       {resultViewModel ? (
         <DungeonResultPanel viewModel={resultViewModel} onContinue={handleContinue} />

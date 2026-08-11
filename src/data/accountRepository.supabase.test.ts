@@ -111,12 +111,14 @@ const {
   linkIdentityMock,
   onAuthStateChangeMock,
   unsubscribeMock,
+  signInWithPasswordMock,
 } = vi.hoisted(() => {
   const rpcFn = vi.fn()
   const fromFn = vi.fn()
   const reportErrorFn = vi.fn()
   const signInWithOAuthFn = vi.fn()
   const linkIdentityFn = vi.fn()
+  const signInWithPasswordFn = vi.fn()
   const unsubscribeFn = vi.fn()
   const onAuthStateChangeFn = vi.fn(() => ({
     data: { subscription: { unsubscribe: unsubscribeFn } },
@@ -129,6 +131,7 @@ const {
     linkIdentityMock: linkIdentityFn,
     onAuthStateChangeMock: onAuthStateChangeFn,
     unsubscribeMock: unsubscribeFn,
+    signInWithPasswordMock: signInWithPasswordFn,
     supabaseMock: {
       rpc: rpcFn,
       from: fromFn,
@@ -137,6 +140,7 @@ const {
         getSession: vi.fn(),
         signInWithOAuth: signInWithOAuthFn,
         linkIdentity: linkIdentityFn,
+        signInWithPassword: signInWithPasswordFn,
       },
     },
   }
@@ -505,5 +509,137 @@ describe('OAuth redirect URL', () => {
     const linkRedirect = linkIdentityMock.mock.calls[0][0].options.redirectTo
     expect(linkIdentityMock.mock.calls[0][0].provider).toBe('google')
     expect(linkRedirect).toBe(signInRedirect)
+  })
+})
+
+/*
+  ทางตันของผู้เล่นที่เข้าสู่ระบบไม่ได้ (task #93)
+
+  เดิม login() ตอบ 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' ประโยคเดียวให้ทุกความล้มเหลว ไม่ว่าจะเน็ตหลุด
+  เซิร์ฟเวอร์ล่ม Turnstile ไม่ผ่าน หรือโดน rate limit ผู้เล่นที่บัญชีหายไปจริง ๆ หรือจำรหัสผ่าน
+  ไม่ได้ จึงอ่านได้ทางเดียวว่า "พิมพ์ผิด" แล้วพิมพ์ซ้ำไปเรื่อย ๆ จนสรุปเอาเองว่าเซฟหาย/โดนแฮก
+
+  ยืนยันจากซอร์ส supabase/auth (internal/api/token.go) แล้วว่า "ไม่มีบัญชี" กับ "รหัสผ่านผิด"
+  แยกจากกันไม่ได้จริง ๆ ที่ฝั่งนี้ — ทั้งคู่คือ 400 + invalid_credentials + ข้อความเดียวกัน
+  เทสต์ชุดนี้จึงไม่ได้ตรึง "แยกให้ได้" แต่ตรึงสามอย่าง: (1) ข้อความต้องไม่โกหกว่าพิมพ์ผิดคือ
+  สาเหตุเดียว (2) ต้องไม่สัญญาทางออกที่ยังไม่มีอยู่บนจอ และ (3) code ที่ยิงได้เฉพาะกับอีเมล
+  ที่ "มีบัญชี" ต้องไม่ได้ข้อความเฉพาะของตัวเอง
+*/
+describe('#93 describeSignInError: ข้อความล็อกอินต้องตรงกับสาเหตุจริง', () => {
+  test('invalid_credentials: พูดถึงทั้งสองความเป็นไปได้ โดยไม่สัญญาปุ่มที่ยังไม่มี', async () => {
+    const { describeSignInError, SIGN_IN_FAILED_MESSAGE } =
+      await import('./accountRepository.supabase')
+
+    const message = describeSignInError({ name: 'AuthApiError', code: 'invalid_credentials' })
+
+    expect(message).toBe(SIGN_IN_FAILED_MESSAGE)
+    // (1) ต้องบอกว่า "ไม่มีบัญชีนี้แล้ว" เป็นสาเหตุที่เป็นไปได้ ไม่ใช่แค่พิมพ์ผิด
+    expect(message).toContain('ไม่มีบัญชี')
+    // (2) ต้องพูดตรง ๆ ว่ายังไม่มีทางตั้งรหัสผ่านใหม่ — ผู้เล่นจะได้เลิกพิมพ์ซ้ำ
+    expect(message).toContain('ยังไม่มีระบบตั้งรหัสผ่านใหม่')
+    // (3) ห้ามชี้ไปที่ปุ่ม/ลิงก์กู้บัญชี ตราบใดที่ยังไม่มีปุ่มนั้นอยู่บนจอจริง (ยังไม่ได้ตั้ง SMTP)
+    expect(message).not.toContain('ลืมรหัสผ่าน')
+    // ข้อความเดิมเป๊ะ ๆ ต้องไม่กลับมา
+    expect(message).not.toBe('อีเมลหรือรหัสผ่านไม่ถูกต้อง')
+  })
+
+  test('เน็ตหลุด/เซิร์ฟเวอร์ล่ม: ไม่โทษรหัสผ่านของผู้เล่น', async () => {
+    const { describeSignInError, SIGN_IN_FAILED_MESSAGE } =
+      await import('./accountRepository.supabase')
+
+    // auth-js โยนคลาสนี้ให้ status 0 และ 500–530 โดยไม่มี code ติดมาด้วย
+    const message = describeSignInError({ name: 'AuthRetryableFetchError' })
+
+    expect(message).toContain('อินเทอร์เน็ต')
+    expect(message).not.toBe(SIGN_IN_FAILED_MESSAGE)
+  })
+
+  test.each([
+    ['over_request_rate_limit', 'ถี่เกินไป'],
+    ['captcha_failed', 'บอท'],
+  ])('code %s ได้ข้อความของสาเหตุนั้นจริง ไม่ใช่ข้อความรหัสผ่านผิด', async (code, fragment) => {
+    const { describeSignInError, SIGN_IN_FAILED_MESSAGE } =
+      await import('./accountRepository.supabase')
+
+    const message = describeSignInError({ name: 'AuthApiError', code })
+
+    expect(message).toContain(fragment)
+    expect(message).not.toBe(SIGN_IN_FAILED_MESSAGE)
+  })
+
+  /*
+    ทั้งสอง code นี้ยิงได้เฉพาะเมื่อ GoTrue "หาผู้ใช้เจอแล้ว" — อีเมลที่ไม่มีบัญชีไม่มีทางได้มัน
+    ข้อความเฉพาะของมันจึงเท่ากับบอกคนถามว่า "อีเมลนี้มีบัญชีอยู่จริง" โดยไม่ต้องรู้รหัสผ่านเลย
+    ซึ่งเป็น oracle แบบเดียวกับที่ invalid_credentials จงใจไม่เป็น ทั้งคู่ต้องตกไปที่ข้อความกลาง ๆ
+    ตัวเดียวกับ code ที่ไม่รู้จัก เพื่อไม่ให้แยกออกจากกันได้จากฝั่งผู้ถาม
+  */
+  test.each(['email_not_confirmed', 'user_banned'])(
+    'code %s ไม่มีข้อความเฉพาะของตัวเอง — ห้ามรั่วว่าอีเมลนี้มีบัญชีอยู่',
+    async (code) => {
+      const { describeSignInError } = await import('./accountRepository.supabase')
+
+      const message = describeSignInError({ name: 'AuthApiError', code })
+
+      expect(message).toBe(describeSignInError({ name: 'AuthApiError', code: 'nonsense_code' }))
+      expect(message).not.toContain('ยืนยันอีเมล')
+      expect(message).not.toContain('ระงับ')
+    },
+  )
+
+  test('code ที่ไม่รู้จักตกไปที่ "ไม่คาดคิด" ไม่ใช่ตกไปที่ "รหัสผ่านผิด"', async () => {
+    const { describeSignInError, SIGN_IN_FAILED_MESSAGE } =
+      await import('./accountRepository.supabase')
+
+    // user_not_found มีอยู่ในรายการ ErrorCode ของ auth-js แต่ endpoint นี้ไม่เคยส่งมันออกมาเลย
+    // (token.go ใช้ invalid_credentials ทั้งสองกิ่ง) — ห้ามเดาแทนผู้เล่นว่าบัญชีไม่มีอยู่จริง
+    expect(describeSignInError({ name: 'AuthApiError', code: 'user_not_found' })).not.toBe(
+      SIGN_IN_FAILED_MESSAGE,
+    )
+    expect(describeSignInError({ name: 'AuthApiError', code: 'nonsense_code' })).toContain(
+      'ไม่คาดคิด',
+    )
+    // ไม่มี error เลยแต่ก็ไม่มี user กลับมา — ก็ไม่ใช่ความผิดของรหัสผ่านเช่นกัน
+    expect(describeSignInError(null)).toContain('ไม่คาดคิด')
+  })
+})
+
+describe('#93 login(): ส่งข้อความจาก describeSignInError ไม่ใช่ประโยคตายตัว', () => {
+  beforeEach(() => {
+    fromMock.mockReset()
+    reportErrorMock.mockReset()
+    signInWithPasswordMock.mockReset()
+  })
+
+  test('รหัสผ่านผิด/ไม่มีบัญชี: คืนข้อความใหม่ ไม่ยิง loadPlayer ต่อ และ log ไว้ให้สืบได้', async () => {
+    const { login, SIGN_IN_FAILED_MESSAGE } = await import('./accountRepository.supabase')
+    const authError = { name: 'AuthApiError', code: 'invalid_credentials', status: 400 }
+    signInWithPasswordMock.mockResolvedValue({ data: { user: null }, error: authError })
+
+    const result = await login('  Player@Example.com  ', 'wrongpass', 'captcha-token')
+
+    expect(signInWithPasswordMock).toHaveBeenCalledWith({
+      email: 'Player@Example.com',
+      password: 'wrongpass',
+      options: { captchaToken: 'captcha-token' },
+    })
+    expect(result).toEqual({ ok: false, error: SIGN_IN_FAILED_MESSAGE })
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).toHaveBeenCalledWith('AUTH_SUBMIT_FAIL', 'silent', authError)
+  })
+
+  test('เน็ตหลุด: ผู้เล่นได้ข้อความเรื่องการเชื่อมต่อ ไม่ใช่ "รหัสผ่านไม่ถูกต้อง"', async () => {
+    const { login, SIGN_IN_FAILED_MESSAGE } = await import('./accountRepository.supabase')
+    signInWithPasswordMock.mockResolvedValue({
+      data: { user: null },
+      error: { name: 'AuthRetryableFetchError', status: 0 },
+    })
+
+    const result = await login('player@example.com', 'password123')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('อินเทอร์เน็ต')
+      expect(result.error).not.toBe(SIGN_IN_FAILED_MESSAGE)
+    }
   })
 })

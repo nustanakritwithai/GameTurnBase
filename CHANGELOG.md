@@ -9,6 +9,98 @@ Versioning follows [Semantic Versioning 2.0.0](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-11
+
+A release about things that read as safe and were not. A verification instruction
+that could only ever return "all clear". A secret scan that reported green because
+its own lookup never ran. A login error that named the wrong cause. Five commits
+carrying a key that a revert could not reach. The common shape: **a check that
+agrees with itself, and never asks who else depends on the answer.**
+
+### Security
+
+- **A shipped migration told the operator that a count of zero meant it was safe
+  to arm an account-deletion job.** Zero on 2026-09-06; twelve two days later.
+  Every clock-driven clause in that check has the form `<timestamp> < now() -
+interval '30 days'` — an age test, and age only increases — while the clause
+  that _shelters_ an account expires by the same arithmetic. Every term widened
+  the deletable set as the clock ran and not one narrowed it, so the count was
+  never a blast radius; it measured the leading edge of an advancing window at the
+  one moment nobody was due. The replacement contains no `now()` at all: it
+  projects a `deletable_from` date per account, so there is nothing left to
+  misread as a green light. SQL body unchanged
+- **Both account-deletion cron jobs are disarmed in a file, not just on one
+  database.** `cron.unschedule('name')` raises when the job is absent, so the
+  statement is set-based on purpose and re-runs clean. The functions are
+  deliberately left in place; only the schedules are gone
+- **The login error stopped naming a cause it could not know.** One message
+  covered a wrong password, a deleted account and a network failure alike. Two
+  Supabase codes that would have distinguished them were **removed rather than
+  shipped**: `email_not_confirmed` and `user_banned` fire only for an address that
+  _has_ an account, which is the account-existence oracle `invalid_credentials`
+  deliberately avoids. Measured before deciding — `mailer_autoconfirm: true`, zero
+  unconfirmed users, zero banned — so the first cannot fire today, and the day it
+  could is the day custom SMTP arrives. It would have armed itself exactly when
+  the recovery flow shipped
+- **A Supabase publishable key and the project URL were removed from history,
+  not silenced.** A revert had taken them out of the working tree the day before,
+  but a scan walks commits, and a commit that exists cannot be un-found — so the
+  secret scan stayed red on every push. History was rewritten across the five
+  commits that carried them: 743 commits before and after, file contents
+  byte-identical to the old tip, none of the 28 tags affected. The proof it worked
+  is that `.gitleaksignore` could then be **deleted**, and the scan came back green
+  on a commit that does not contain it. An alarm with nothing to report is not the
+  same as an alarm told to stay quiet
+- **Account enumeration is now a named, reportable class in `SECURITY.md`**, with
+  the two known exceptions written down rather than left to be rediscovered
+
+### Fixed
+
+- **Two objective HUDs could describe the same stage differently.** One HUD now,
+  with validity guards shared by both objective paths and a safe fallback when a
+  stage carries no objective (external PR #107)
+- **A Realtime migration aborted itself.** `alter table realtime.messages enable
+row level security` targets a platform-owned table; it fails on ownership and
+  takes the whole file down with it, leaving no policy at all. The migration is
+  policy-only now, and the PGLite harness still models the platform default so
+  removing that line turns three tests red (external PR #109)
+- **PR #111 reverted.** Six commits, three unrelated topics, merged straight to
+  master past a gate that had already bounced part of it
+
+### Tests
+
+- **`loadPlayer`'s guard was covered for five of its eight read slices.** Because
+  all eight share one branch, five green rows read like proof of a branch three
+  slices had never entered. The table list is now discovered from the calls the
+  code actually makes, with a tripwire that fails if the query count changes
+- **The save-export credential guard now walks every key at every depth** and
+  matches a key pattern rather than a name list. The previous allowlist promised
+  new sensitive fields could not leak unnoticed, but two sub-objects passed through
+  whole — the promise stopped one level down
+- The new pre-arm projection is pinned twice: as source text, and **executed** —
+  lifted out of its comment block and run against the fully replayed migration
+  chain on a fixture where the old check reads a clean zero
+
+### Governance
+
+- **`master` went from one required check to ten**, with up-to-date-before-merge
+  enforced and self-merge closed: an approval is required, stale approvals are
+  dismissed, and the last pusher cannot be the approver. `CODEOWNERS` makes it the
+  owner's approval specifically — "one approval" never said whose, and two
+  non-admin collaborators could close the loop between them
+- **Outside code lands from a fork.** A repository ruleset restricts branch
+  creation and updates, so a non-admin contributor forks and opens a pull request
+  rather than pushing a branch here. Break-glass for admins is unchanged and
+  deliberate
+
+### Credits
+
+- **nustanakritwithai** — external PRs #107 and #109, both taken in through the
+  belt. #109 is also the standing evidence for a gap no local test can cover: the
+  Realtime ownership error is a property of Supabase's hosted schema at runtime,
+  and it was found by running the migration against a real project, not by reading
+  it
+
 ## [0.17.0] - 2026-08-10
 
 No new toys. This release swaps the material of an existing skeleton. All of it
@@ -102,16 +194,22 @@ same species: correct code with nothing pinning it there.**
   running tests; contending for CPU produced false failures a gate cannot
   distinguish from a real regression
 
-### Not yet live
+### Server state
 
-- **The progression-cost migration ships in this release but is not applied.**
-  `20260810180000` revokes UPDATE on `owned_characters` and drops the 21-argument
-  `commit_lobby_battle_progression`, both of which the currently deployed client
-  still uses. Applying it before this build reaches players turns every save into
-  a `42501` — rolling back team, friends and flags, not just progression — and
-  every battle commit into a `PGRST202`. Correct order: deploy this build, then
-  apply the migration. Until then the free-upgrade path is closed in the code and
-  open on the server
+- **The progression-cost migration was applied after this build reached
+  players, in that order on purpose.** `20260810180000` revokes UPDATE on
+  `owned_characters` and drops the 21-argument
+  `commit_lobby_battle_progression`, both of which the previously deployed
+  client still used — applying it first would have turned every save into a
+  `42501` (rolling back team, friends and flags, not just progression) and every
+  battle commit into a `PGRST202`. Verified on production 2026-08-11: the cost
+  catalog holds 21 rows and is unreachable from the client, the RPC is down to a
+  single 18-argument overload, and `authenticated` holds no UPDATE on
+  `owned_characters`. One residue: the revoke names `authenticated` only, so
+  `anon` keeps a table-level UPDATE grant. RLS closes it — the UPDATE policy
+  requires `auth.uid() = profile_id`, which no anonymous request can satisfy —
+  but the migration's own comment claiming the client is left "no writable
+  column at all" overstates what it did
 
 ### Credits
 

@@ -126,12 +126,48 @@ describe('importSave', () => {
   ใครที่ได้ไฟล์ไปก็ไล่เดารหัสผ่านแบบออฟไลน์ได้เลยโดยไม่ต้องแตะเซิร์ฟเวอร์ ตรวจจับไม่ได้
   และล็อกบัญชีไม่ได้
 */
+/**
+ * คีย์ที่ถือว่าเป็นวัตถุดิบของ credential/ตัวตน — ชุดเดียวกับ SENSITIVE_KEY ใน
+ * src/lib/errors/normalizeError.ts โดยเจตนา (นิยาม "อ่อนไหว" ควรเป็นชุดเดียวกันทั้งโปรเจกต์)
+ * แยกก๊อบปี้ไว้ที่นี่เพราะกติกาสองที่ต่างกันจริง: รายงาน error ลบอีเมลทิ้ง แต่ไฟล์ save ต้องมี
+ */
+const CREDENTIAL_KEY = /pass|secret|token|auth|jwt|cookie|salt|hash|credential|api[-_]?key|email/i
+
+/*
+  ข้อยกเว้นเดียว ระบุเป็น "เส้นทางเต็ม" ไม่ใช่ชื่อคีย์ — email ที่ตำแหน่งอื่นยังถือว่ารั่ว
+
+  importSave() ใช้ account.email เป็นคีย์เขียนบัญชีกลับ (normalizeEmail(account.email)) ตัดออก
+  แล้วนำเข้าไม่ได้เลย และมันเป็นอีเมลของเจ้าของไฟล์เอง ไม่ใช่ของคนอื่น — ดูเหตุผลเต็มใน
+  MEMORY/27-error-observability-system.md
+*/
+const EXPORT_KEY_ALLOWED = new Set(['$.account.email'])
+
+/** ไล่เก็บทุกคีย์ทุกความลึกเป็น map ของ เส้นทางเต็ม → ชื่อคีย์ */
+function collectKeyPaths(value: unknown, path = '$', out = new Map<string, string>()) {
+  if (value === null || typeof value !== 'object') return out
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectKeyPaths(item, `${path}[${index}]`, out))
+    return out
+  }
+  for (const [key, child] of Object.entries(value)) {
+    out.set(`${path}.${key}`, key)
+    collectKeyPaths(child, `${path}.${key}`, out)
+  }
+  return out
+}
+
+/*
+  ทำไมเทสต์ชุดนี้ไม่เน่า: มันไม่ได้ไล่รายชื่อคีย์ชั้นบนสุดทีละตัว แต่เดินลงไปทุกความลึกแล้ว
+  จับด้วย "รูปแบบชื่อคีย์" — วันที่มีคนห่อ payload ลึกลงไปอีกชั้น หรือเพิ่มฟิลด์อ่อนไหวลงใน
+  Player/CurrencyTransaction (ซึ่ง exportSave ส่งผ่านทั้งก้อน ไม่ได้คัดทีละฟิลด์เหมือนชั้นบน)
+  มันยังจับได้เหมือนเดิม
+*/
 describe('exportSave — ไฟล์สำรองต้องไม่พกรหัสผ่านติดไปด้วย', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  test('ไฟล์ที่ส่งออกไม่มี passwordHash/passwordSalt', async () => {
+  test('ไฟล์ที่ส่งออกไม่มีคีย์ credential ที่ความลึกระดับใดเลย', async () => {
     const registered = await register('export-safety@b.co', 'รหัสผ่านทดสอบ1')
     expect(registered.ok).toBe(true)
 
@@ -143,9 +179,21 @@ describe('exportSave — ไฟล์สำรองต้องไม่พก�
     expect(result.json).not.toContain('passwordHash')
     expect(result.json).not.toContain('passwordSalt')
 
-    const parsed = JSON.parse(result.json)
-    expect(parsed.account.uid).toBeTruthy()
-    expect(parsed.account.player).toBeTruthy()
+    const keyPaths = collectKeyPaths(JSON.parse(result.json))
+
+    /*
+      กันเทสต์ตายซาก: ถ้าโครงไฟล์เปลี่ยนจนตัวไล่เดินไม่เจออะไรเลย การเช็คด้านล่างจะผ่าน
+      แบบว่างเปล่า สองบรรทัดนี้บังคับว่าต้องเดินลงไปได้ลึกจริงก่อน ถึงจะเชื่อผลได้
+      (ไม่ผูกกับชื่อฟิลด์ใดฟิลด์หนึ่ง — เปลี่ยนตัวละครเริ่มต้นแล้วไม่พังตาม)
+    */
+    expect(keyPaths.size).toBeGreaterThan(30)
+    const deepest = Math.max(...[...keyPaths.keys()].map((path) => path.split('.').length))
+    expect(deepest).toBeGreaterThanOrEqual(6)
+
+    const leaked = [...keyPaths]
+      .filter(([path, key]) => CREDENTIAL_KEY.test(key) && !EXPORT_KEY_ALLOWED.has(path))
+      .map(([path]) => path)
+    expect(leaked).toEqual([])
   })
 
   test('นำเข้าไฟล์ที่ไม่มีรหัสผ่านกลับได้ แต่ล็อกอินด้วยบัญชีนั้นไม่ได้', async () => {

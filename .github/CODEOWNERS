@@ -1,18 +1,15 @@
-# ใครควรถูกขอรีวิวเมื่อมีคนแตะไฟล์ไหน
+# Every path in this repository is owned by HetCreep.
 #
-# ตอนนี้ยังไม่ได้เปิด "require review from Code Owners" ใน branch protection ไฟล์นี้จึงเป็น
-# แค่คำใบ้ให้ GitHub เสนอชื่อผู้รีวิวเอง ไม่ได้บังคับอะไร — ถ้าเปิดวันหลังค่อยกลายเป็นข้อบังคับ
-# (ดู MEMORY.md หัวข้อ Branch protection ว่าทำไมยังไม่เปิด)
-
-*                       @HetCreep
-
-# กฎที่ผูกพัน agent ทุกตัว — แก้ผิดที่นี่กระทบทุก session ทุกเครื่อง
-/AGENTS.md              @HetCreep
-/.agents/               @HetCreep
-
-# ทางที่โค้ดออกสู่ผู้เล่นจริง + สิทธิ์ที่ workflow ถืออยู่
-/.github/workflows/     @HetCreep
-
-# บัญชี รหัสผ่าน สิทธิ์ผู้ดูแล
-/src/data/              @HetCreep
-/src/lib/password.ts    @HetCreep
+# Paired with `require_code_owner_reviews` on the master branch protection, this makes
+# HetCreep's approval mandatory on every pull request. It exists because two non-admin
+# collaborators holding write access could otherwise approve each other's work and land
+# it with the owner never in the loop — the "1 approval" rule alone does not say WHOSE.
+#
+# This encodes AGENTS.md rule 18: Ring 0 is the standing merge controller. Break-glass is
+# unchanged and deliberate — branch protection keeps `enforce_admins: false`, so a
+# repository admin can still land work directly when HetCreep is unavailable. That path is
+# meant to be logged, not silent (rule 18's break-glass clause).
+#
+# A single line, deliberately. A per-path owner table would be a second source of truth
+# about who reviews what, and it would drift from this file the first time a directory moves.
+* @HetCreep

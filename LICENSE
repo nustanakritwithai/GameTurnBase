@@ -19,3 +19,60 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+CARVE-OUT — docs/SPRITE-DESIGN-LOCK.md
+
+Copyright (c) 2026 HetCreep / Katomnoi Studio. All rights reserved.
+
+The MIT grant above does NOT apply to docs/SPRITE-DESIGN-LOCK.md. That file is
+licensed separately under Creative Commons Attribution-NonCommercial-NoDerivatives
+4.0 International (CC BY-NC-ND 4.0):
+
+    https://creativecommons.org/licenses/by-nc-nd/4.0/
+
+You may read it, quote it with attribution, and share it unchanged for
+non-commercial purposes. You may not use it commercially, and you may not
+distribute a modified version, without a separate written licence from the
+copyright holder.
+
+Every other file in this repository, including docs/SPRITE-CONFORMANCE.md,
+remains under the MIT licence above.
+
+STANDING GRANT — Katomnoi Studio (github.com/KatomnoiStudio)
+
+Katomnoi Studio is granted a perpetual, irrevocable, royalty-free licence to
+use, reproduce, modify, and create derivative works from
+docs/SPRITE-DESIGN-LOCK.md, and to apply it in the Studio's own products and
+services, including commercially.
+
+This grant does NOT include the right to sublicense that file, or to distribute
+it or substantial portions of it to third parties. An MIT-style grant would
+include both, and either one would release the document to anyone who received
+a copy — which is exactly what the CC BY-NC-ND terms exist to prevent. The
+Studio may freely ship whatever it BUILDS from the document; the document
+itself remains the copyright holder's to license.
+
+If the copyright holder and Katomnoi Studio are the same legal person, this
+grant is redundant but harmless. If they are not, it is the operative
+permission and should be recorded outside this file as well.
+
+SCOPE AND LIMITS OF THIS CARVE-OUT — read before relying on it
+
+  1. It applies from the commit that introduced it onward. Earlier revisions of
+     docs/SPRITE-DESIGN-LOCK.md were published in this public repository under
+     MIT. A licence grant already made cannot be withdrawn for copies already
+     distributed, and forks of this repository exist.
+
+  2. "LegendofSoulTH" in the MIT notice above is a project name, not a legal
+     person. For the carve-out to be enforceable the holder should be a named
+     individual or a registered entity. This has not been settled.
+
+  3. Measurements and factual data stated in that file are facts, and facts are
+     not copyrightable in most jurisdictions. What this carve-out can protect is
+     the selection, arrangement, and expression — not the numbers themselves.
+
+  4. This carve-out was drafted by an AI assistant at the owner's direction and
+     has NOT been reviewed by a lawyer. It is not legal advice. If anything of
+     value depends on it, have a lawyer settle points 1 to 3 first.

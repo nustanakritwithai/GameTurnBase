@@ -101,6 +101,7 @@ dump?), not a UI-honesty fix, and out of scope for this dispatch regardless of t
 **The `email` field in the dormant repo's export allowlist (`accountRepository.ts:483`) —
 verdict: correct, not a leak, evidence recorded.** Reasoned it out rather than reflexively
 stripping it, per the dispatch's own instruction:
+
 - **Who can trigger it:** `exportSave()` reads `readActiveSession()` then indexes
   `loadDb().accounts[session.email]` — only the currently-logged-in player's OWN account. There
   is no code path to export anyone else's record.
@@ -253,3 +254,34 @@ worth knowing: on a rejection, `hasGoogleLinked` stays `false`, so `SettingsModa
 instead of a code that names what actually failed. Fix, if picked up: wrap each call site (or
 `refreshLinkedProviders` itself) in a `try`/`catch` reporting a dedicated code — the same shape
 as every other `useAuth.ts` mutation already uses.
+
+## CLOSED — the export-leak finding was re-raised, re-measured, and is stale (2026-08-11)
+
+A fresh audit dispatch arrived carrying the original finding verbatim ("the crash-screen backup
+export can carry `passwordHash`, `salt`, and the account email"). Re-measured from scratch rather
+than trusting either the finding or this file: registered an account, called the real
+`exportSave()`, walked the produced JSON and dumped every key at every depth.
+
+**What actually reaches the file today:** `exportVersion`, `exportedAt`, and `account.{uid, email,
+createdAt, player, transactions}` — 57 key-paths, deepest 7 levels. `passwordHash` and
+`passwordSalt` are absent at every depth. Two of the finding's three fields were already fixed in
+`464637d` (which changed `account: StoredAccount` — the whole record — to the explicit allowlist
+`{uid, email, createdAt, player, transactions}`); the third, `email`, is present by the deliberate
+verdict recorded above. **Nothing to strip. No production code changed.**
+
+The finding is also unreachable three ways over: the crash-screen button is gone (`7af8885`), the
+Settings button is gone, and `accountRepository.supabase.ts` — the only repo any production module
+imports — has no `exportSave` at all. `accountRepository.ts` still has zero production importers.
+
+**What DID change: the test that guards it no longer rots.** The old assertion was two hand-listed
+names (`json.not.toContain('passwordHash')`), which says nothing about a sensitive field added
+later to `Player` or `CurrencyTransaction` — and `exportSave` passes both of those through whole,
+so the allowlist's "a new sensitive field can't leak unnoticed" guarantee stops at depth 1. The
+test now walks every key at every depth and matches on a key _pattern_ (the same set as
+`normalizeError.ts`'s `SENSITIVE_KEY`), with `$.account.email` allowed by full path — not by key
+name, so an `email` anywhere else still fails. Proven non-vacuous by injecting two regressions:
+restoring the pre-`464637d` whole-record export (red), and nesting a `linkedAuthEmail` inside
+`player` (red, naming `$.account.player.linkedAuthEmail` — the old test passed this one silently).
+A size+depth floor keeps it from passing empty if the payload shape ever collapses.
+
+**For the next auditor: this finding is closed. Re-raising it needs new evidence, not a re-read.**

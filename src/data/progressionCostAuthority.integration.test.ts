@@ -26,6 +26,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const TEST_USER = '11111111-1111-1111-1111-111111111111'
 const MIGRATION = '20260810180000_p26_progression_cost_authority.sql'
+const DISARM_MIGRATION = '20260811000000_disarm_account_deletion_crons.sql'
+const DEAD_ACCOUNT_MIGRATION = '20260810170000_security_reconcile_dead_account_cleanup.sql'
 const SPEND_RPC = 'public.spend_progression_upgrade(uuid,text,text,text,int)'
 
 /** Fixtures are inserted after this file, because 0014's exempt seed FKs into profiles. */
@@ -109,6 +111,10 @@ describe('spend_progression_upgrade — the cost side is server-authoritative', 
       create schema if not exists auth;
       create table if not exists auth.users (
         id uuid primary key,
+        -- email so 20260810170000's pre-arm projection runs here verbatim, as pasted;
+        -- raw_user_meta_data because 0001's handle_new_user trigger reads it on every insert.
+        email text,
+        raw_user_meta_data jsonb,
         is_anonymous boolean not null default false,
         created_at timestamptz not null default now(),
         last_sign_in_at timestamptz
@@ -134,9 +140,30 @@ describe('spend_progression_upgrade — the cost side is server-authoritative', 
       -- structural blindness starAscension.integration.test.ts documents.
       alter default privileges in schema public grant all on functions to anon, authenticated;
 
+      -- pg_cron is Supabase-hosted and PGlite cannot install it, but a stub that only returns 1
+      -- makes the schedule INVISIBLE, and the schedule is the thing worth watching: this chain
+      -- arms both account-deletion jobs (0006, 0014) before 20260811000000 disarms them, and
+      -- until that file existed a replay left them armed. So this stub CAPTURES — cron.job in
+      -- the shape the real one exposes, narrowed to the columns this chain writes.
       create schema if not exists cron;
-      create or replace function cron.schedule(job_name text, schedule text, command text)
-      returns bigint language sql as $$ select 1::bigint $$;
+      create table if not exists cron.job (
+        jobid bigserial primary key,
+        jobname text unique,
+        schedule text not null,
+        command text not null
+      );
+      create or replace function cron.schedule(job_name text, cron_expr text, cron_command text)
+      returns bigint language sql as $$
+        insert into cron.job (jobname, schedule, command)
+        values (job_name, cron_expr, cron_command)
+        on conflict (jobname) do update
+          set schedule = excluded.schedule, command = excluded.command
+        returning jobid
+      $$;
+      create or replace function cron.unschedule(job_id bigint)
+      returns boolean language sql as $$
+        delete from cron.job where jobid = job_id returning true
+      $$;
 
       -- Supabase ships this publication; the realtime migrations add tables to it.
       do $$ begin
@@ -679,5 +706,122 @@ describe('spend_progression_upgrade — the cost side is server-authoritative', 
       'select count(*)::int as n from public.progression_spend_ledger',
     )
     expect(ledger.rows[0].n).toBeGreaterThan(0)
+  })
+
+  /*
+    Task #91. The whole-chain replay above is the only place in this repo where "what does a
+    FRESH environment end up with" is observable, which is why this assertion lives here rather
+    than in a cron-shaped file of its own. 0006 and 0014 schedule the two account-deletion jobs
+    earlier in this very chain; production disarmed them by hand on 2026-08-10 and every
+    `cron.unschedule` written down since was a comment, so a restore, a `db reset`, or a new
+    contributor's local setup silently re-armed both. Source-text cover for future migrations is
+    in supabaseMigrations.contract.test.ts; this is the behavioural half — it fails if the disarm
+    stops running, runs in the wrong order, or ever takes a job with it that it should not.
+  */
+  it('ends the chain with both account-deletion jobs disarmed and every other cron job intact', async () => {
+    const scheduledJobs = async (): Promise<string[]> => {
+      const result = await db.query<{ jobname: string }>(
+        'select jobname from cron.job order by jobname',
+      )
+      return result.rows.map((row) => row.jobname)
+    }
+    // reap-expired-private-pvp-rooms is absent only because its migration is REALTIME_ONLY here.
+    const survivors = [
+      'archive-currency-transactions',
+      'cleanup-old-audit-log-entries',
+      'cleanup-stale-rpc-rate-limit-rows',
+    ]
+
+    expect(await scheduledJobs()).toEqual(survivors)
+
+    // `cron.unschedule('name')` raises on a job that is already gone, and the owner relays by
+    // hand — so the disarm has to be a no-op on the second paste, not an error.
+    await applyMigration(DISARM_MIGRATION)
+    expect(await scheduledJobs()).toEqual(survivors)
+  })
+
+  /*
+    Task #92. Section 4 of the dead-account migration used to hold that job's own predicate with
+    `count(*)` in place of `delete`, under one line of instruction: a returned 0 was the stated
+    precondition for `cron.schedule`. It was relayed to the owner in those terms and believed.
+
+    Every clock-driven clause in it is an age test against `now()`, `now()` binds when the query
+    runs, and age only ever increases — so the count reads 0 on a day nobody happens to be due and
+    bounds nothing about the day the cron actually fires. Measured forward on the real population:
+    0 accounts on 2026-09-06, 12 on 2026-09-08.
+
+    supabaseMigrations.contract.test.ts pins the instruction's source text. This is the other half:
+    the replacement is lifted out of that comment block and RUN, unedited, against the fully
+    replayed schema — because the owner pastes it into the SQL Editor by hand, and shipping a
+    query nobody ever executed is the same defect one size smaller.
+  */
+  describe('the pre-arm projection that replaced that check', () => {
+    const DUE_TOMORROW = '22222222-2222-2222-2222-222222222222'
+    const PAYER = '33333333-3333-3333-3333-333333333333'
+    const GUEST = '44444444-4444-4444-4444-444444444444'
+    /** The removed check, in its exact shape: the deletion predicate, counted instead of run. */
+    const REMOVED_POINT_IN_TIME_CHECK = `
+      select count(*)::int as n from auth.users u
+      where u.is_anonymous is false
+        and u.created_at < now() - interval '30 days'
+        and coalesce(u.last_sign_in_at, u.created_at) < now() - interval '30 days'
+        and not exists (select 1 from public.battle_history bh where bh.profile_id = u.id)
+        and not exists (
+          select 1 from public.currency_transactions ct
+          where ct.profile_id = u.id and ct.source <> 'signup'
+            and ct.created_at > now() - interval '30 days')
+        and not exists (
+          select 1 from public.cleanup_exempt_profiles ce where ce.profile_id = u.id)
+        and not exists (
+          select 1 from public.currency_transactions ct
+          where ct.profile_id = u.id and ct.source = 'topup')`
+
+    // Inserted through auth.users so 0001's handle_new_user trigger builds each account the way
+    // a real signup does — profile, starter hero, team slots, and the 'signup' ledger rows whose
+    // backfill 20260810170000 documents as the reason its freshness guard excludes that source.
+    beforeAll(async () => {
+      await db.exec(`
+        insert into auth.users (id, email, created_at, last_sign_in_at, raw_user_meta_data) values
+          ('${DUE_TOMORROW}', 'quiet-signup@example.test',
+             now() - interval '29 days', now() - interval '29 days',
+             '{"uid":"2000000007","name":"QuietSignup"}'::jsonb),
+          ('${PAYER}', 'paid-once@example.test', now() - interval '40 days', null,
+             '{"uid":"2000000008","name":"Payer"}'::jsonb);
+        insert into auth.users (id, email, is_anonymous, created_at, raw_user_meta_data) values
+          ('${GUEST}', null, true, now() - interval '40 days',
+             '{"uid":"2000000009","name":"Guest"}'::jsonb);
+
+        insert into public.currency_transactions (profile_id, currency, source, amount)
+          values ('${PAYER}', 'gem', 'topup', 100);
+      `)
+    })
+
+    it('THE TRAP: the removed check reads a clean zero the day before it takes an account', async () => {
+      const result = await db.query<{ n: number }>(REMOVED_POINT_IN_TIME_CHECK)
+
+      expect(result.rows[0].n).toBe(0)
+    })
+
+    it('names the account that zero could not see, and the date it goes', async () => {
+      const sql = readFileSync(
+        join(process.cwd(), 'supabase/migrations', DEAD_ACCOUNT_MIGRATION),
+        'utf8',
+      )
+      const projection = (/^--\s+select\b[\s\S]*?;\s*$/m.exec(sql)?.[0] ?? '').replaceAll(
+        /^--\s?/gm,
+        '',
+      )
+
+      const result = await db.query<{ id: string; deletable_from: Date }>(projection)
+
+      // TEST_USER has battle_history (PROBE-A), the three dev accounts sit in
+      // cleanup_exempt_profiles, PAYER has a topup, and GUEST is the other job's business. What
+      // is left is the single account the count above scored as nothing at all.
+      expect(result.rows.map((row) => row.id)).toEqual([DUE_TOMORROW])
+
+      const dueIn = new Date(result.rows[0].deletable_from).getTime() - Date.now()
+      expect(dueIn).toBeGreaterThan(0)
+      expect(dueIn).toBeLessThan(2 * 24 * 60 * 60 * 1000)
+    })
   })
 })

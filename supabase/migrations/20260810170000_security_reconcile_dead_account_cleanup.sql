@@ -10,8 +10,9 @@
 -- ⚠ THIS FILE SCHEDULES NOTHING. `cleanup-dead-unplayed-accounts` was `cron.unschedule`d on
 -- 2026-08-10 (MEMORY item 190 Part B) and STAYS unscheduled. Applying this replaces the function
 -- body; it does not put the job back on the schedule. Re-arming is the owner's separate,
--- deliberate act — do not read "fixed" as "running". Run the PRE-ARM CHECK at the bottom of this
--- file first; re-arm only if it returns 0.
+-- deliberate act — do not read "fixed" as "running". Section 4 at the bottom of this file names
+-- every account this job will eventually take and the date each one enters range; read it first,
+-- and read it as an inventory, because no output of it authorises anything.
 --
 -- ── WHICH BODY WAS AUTHORITATIVE, AND HOW WE KNOW ───────────────────────────────────────────
 -- Production ran, verbatim:
@@ -145,32 +146,78 @@ $$;
 revoke execute on function public.cleanup_dead_unplayed_accounts() from public, anon, authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════════════════════
--- 4. PRE-ARM CHECK — run this BEFORE any cron.schedule, and do not re-arm unless it returns 0
+-- 4. PRE-ARM PROJECTION — which accounts this job takes, and on what date. An inventory, not a
+--    gate. Read it BEFORE any cron.schedule, and read everything under it as well
 -- ════════════════════════════════════════════════════════════════════════════════════════════
--- Not executed by this migration (a SELECT in a relay paste just prints a number nobody reads
--- twice). This is the exact predicate above, counted instead of deleted, so the blast radius is
--- measured on the real data at the moment of arming rather than estimated from a stale snapshot.
+-- ⚠ WHAT WAS HERE BEFORE, AND WHY IT WAS A TRAP (task #92)
+-- Until 2026-08-11 this section held the predicate above with `count(*)` in place of `delete`,
+-- and one line of instruction: a returned 0 was the stated precondition for `cron.schedule`.
+-- It was relayed to the owner in exactly those terms and believed. It bounds nothing.
 --
--- Under the DEPLOYED body this count was 15 of 17 registered accounts within 30 days. Under the
--- predicate above it can only be smaller — every added clause is conjunctive — but the exact
--- figure has NOT been measured by the author of this file, who has no production access and is
--- not permitted to acquire any. Run it. Do not assume it is zero because it should be.
+-- Every clock-driven clause in that predicate has the shape
+-- `<timestamp> < now() - interval '30 days'`. `now()` binds at the moment the query RUNS, so
+-- each clause is an AGE test, and age only ever increases. An account created 25 days ago fails
+-- the test today and passes it in six days, with nobody doing anything and no row changing. The
+-- currency guard fails from the other side for the same reason: a recent transaction shelters an
+-- account only until that transaction is itself 30 days old. Every time-dependent clause here
+-- WIDENS the deletable set as the clock runs, and not one of them narrows it.
 --
---   select count(*) from auth.users u
+-- So the count never measured the blast radius. It measured the leading edge of a window that
+-- keeps advancing — taken at the one moment nobody happens to be due, and read as proof that
+-- nobody ever would be. And a cron job does not fire once. It fires every day, forever, against
+-- whatever the predicate has swept up by the time it wakes. "How many right now" was never the
+-- question that mattered.
+--
+-- The same predicate, the same population, measured forward in time:
+--     2026-09-06 -> 0 accounts
+--     2026-09-08 -> 12 accounts
+-- Two days apart. Following the old instruction on the first of those dates would have armed a
+-- job that deleted 12 real players on the second — with the check having returned exactly the
+-- number it was told to require. One deletion cascades through 11 tables; this project runs
+-- `pitr_enabled: false` with an empty backup list. There is no undo.
+--
+-- ── THE REPLACEMENT ─────────────────────────────────────────────────────────────────────────
+-- Read-only, free of `now()`, and it answers the question a count cannot: WHICH accounts, and on
+-- WHAT DATE each one enters range. `deletable_from` is the exact instant every clock-driven
+-- clause in section 2 turns true for that row. Postgres `greatest()` ignores NULLs, so an
+-- account GoTrue never stamped falls back to `created_at` — the same thing `coalesce()` does in
+-- the function body, spelled shorter. The three surviving `not exists` clauses hold no clock at
+-- all: a battle, a topup, or an exemption spares an account permanently, at any age.
+--
+--   select u.id, u.email, u.created_at, u.last_sign_in_at,
+--          greatest(
+--            u.created_at,
+--            u.last_sign_in_at,
+--            (select max(ct.created_at) from public.currency_transactions ct
+--             where ct.profile_id = u.id and ct.source <> 'signup')
+--          ) + interval '30 days' as deletable_from
+--   from auth.users u
 --   where u.is_anonymous is false
---     and u.created_at < now() - interval '30 days'
---     and coalesce(u.last_sign_in_at, u.created_at) < now() - interval '30 days'
 --     and not exists (select 1 from public.battle_history bh where bh.profile_id = u.id)
---     and not exists (
---       select 1 from public.currency_transactions ct
---       where ct.profile_id = u.id and ct.source <> 'signup'
---         and ct.created_at > now() - interval '30 days')
---     and not exists (
---       select 1 from public.cleanup_exempt_profiles ce where ce.profile_id = u.id)
---     and not exists (
---       select 1 from public.currency_transactions ct
---       where ct.profile_id = u.id and ct.source = 'topup');
+--     and not exists (select 1 from public.cleanup_exempt_profiles ce where ce.profile_id = u.id)
+--     and not exists (select 1 from public.currency_transactions ct
+--                     where ct.profile_id = u.id and ct.source = 'topup')
+--   order by deletable_from;
 --
--- If it returns non-zero, LIST those accounts before deciding — a non-zero result is a decision
--- for the owner, not a green light:
---   ...same predicate, `select u.id, u.email, u.created_at, u.last_sign_in_at` instead of count.
+-- HOW TO READ THE RESULT. Every row is an account this job takes on or after its own
+-- `deletable_from`, so for any candidate firing date, the cohort that run destroys is the rows
+-- dated on or before it. Rows dated in the past are already due. An all-future result means only
+-- that no account which exists RIGHT NOW is due yet — a far smaller claim than "safe", and one
+-- that expires by the clock rather than by any event.
+--
+-- WHAT IT STILL CANNOT TELL YOU, stated rather than buried:
+--   * Accounts that do not exist yet. Every future signup joins this list 30 days later, so no
+--     run of this query ever retires the question — an armed job re-asks it daily, and the only
+--     honest reading of it is a standing one.
+--   * Future activity moves rows OUT and pushes dates LATER (a battle, a topup, a spend, a real
+--     sign-in) and never the reverse, so the list is the worst case for today's accounts. That
+--     is the direction a safety check has to err in.
+--   * The KNOWN LIMIT in section 2 still applies: a persisted session does not refresh
+--     last_sign_in_at, so a returning player can sit in this list looking untouched.
+--     `cleanup_exempt_profiles` is the escape hatch, and it only helps for a name someone read.
+--   * Whether "signed up and never played" is a fair reason to delete a person's account at all.
+--     That is task #95, and it is the owner's call — not this file's, and not an agent's.
+--
+-- THIS SECTION IS NOT A GATE. No output of this query authorises anything, and there is no
+-- number that makes arming the job a formality. Arming is a decision taken about named accounts
+-- on a named date, or it is not taken.

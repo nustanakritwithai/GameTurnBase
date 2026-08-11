@@ -8,12 +8,9 @@ const GUEST = '22222222-2222-2222-2222-222222222222'
 const THIRD = '33333333-3333-3333-3333-333333333333'
 const MIGRATION = '20260809064000_p12_private_pvp_rooms.sql'
 
-function readMigration(filename: string): string {
-  return readFileSync(join(process.cwd(), 'supabase/migrations', filename), 'utf8')
-}
-
 async function applyMigration(db: PGlite, filename: string): Promise<void> {
-  await db.exec(readMigration(filename))
+  const sql = readFileSync(join(process.cwd(), 'supabase/migrations', filename), 'utf8')
+  await db.exec(sql)
 }
 
 async function setAuthenticatedUser(db: PGlite, userId: string): Promise<void> {
@@ -195,6 +192,35 @@ describe('P12 private PvP room authority migration (isolated Postgres via PGLite
     } finally {
       await db.exec('reset role')
     }
+  })
+
+  it('delivers an authority broadcast to room participants only', async () => {
+    const room = await db.query<{ id: string }>(
+      `select id from public.pvp_rooms where host_profile_id = $1 order by created_at desc limit 1`,
+      [HOST],
+    )
+    const topic = `pvp:${room.rows[0]!.id}`
+    await db.query(
+      `insert into realtime.messages (topic, extension, event, private)
+       values ($1, 'broadcast', 'authoritative_state', true)`,
+      [topic],
+    )
+
+    const broadcastsVisibleTo = async (userId: string): Promise<number> => {
+      await setAuthenticatedUser(db, userId)
+      await db.exec(
+        `select set_config('realtime.topic', '${topic}', false); set role authenticated;`,
+      )
+      try {
+        const seen = await db.query(`select topic from realtime.messages where topic = $1`, [topic])
+        return seen.rows.length
+      } finally {
+        await db.exec('reset role')
+      }
+    }
+
+    expect(await broadcastsVisibleTo(GUEST)).toBe(1)
+    expect(await broadcastsVisibleTo(THIRD)).toBe(0)
   })
 
   it('commits authoritative state with compare-and-swap and rejects stale replay', async () => {

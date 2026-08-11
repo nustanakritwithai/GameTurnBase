@@ -319,6 +319,8 @@ grant execute on function public.commit_pvp_authority_state(uuid, bigint, jsonb,
   to service_role;
 
 -- Private Realtime is receive-only for players. Input never travels as a client-authored broadcast.
+-- `realtime.messages` is platform-owned: RLS is already on and enabling it here fails on ownership,
+-- which would abort this whole migration file. Policies are the only DDL we may add there.
 drop policy if exists "pvp participants receive authority broadcast" on realtime.messages;
 create policy "pvp participants receive authority broadcast"
   on realtime.messages
