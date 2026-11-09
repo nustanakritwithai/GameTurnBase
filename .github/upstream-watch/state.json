@@ -6,7 +6,7 @@
   },
   "affaan-m/ECC": {
     "branch": "main",
-    "sha": "59a99d669f5466d99d5be8b6fce8c5f2677766d0",
+    "sha": "d2ef2680594f9a17526a6e1a2e18b3d242c5d17b",
     "note": "global rules cherry-picked manually per SKILL_REGISTRY.md (frozen policy, not vendored in this repo)"
   }
 }
